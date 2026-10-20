@@ -164,23 +164,32 @@ Item {
 
     function dropWindow(window, position, centerX) {
         const row = rowAt(position);
-        if (row === null) {
-            // dropping between two rows creates a new desktop there
-            const gap = gapAt(position);
-            if (gap !== -1) {
-                window.desktops = [createDesktop(gap)];
-                selectedWindow = window;
-            }
-            return;
-        }
-        if (row.hasWindow(window)) {
+        if (row !== null && row.hasWindow(window)) {
             row.reorderColumn(window, centerX);
             return;
         }
-        // Karousel picks this up and moves the window to the target desktop's grid
-        window.desktops = [row.desktop ?? createDesktop()];
+
+        let desktop;
+        if (row !== null) {
+            desktop = row.desktop ?? createDesktop();
+        } else {
+            // dropping between two rows creates a new desktop there
+            const gap = gapAt(position);
+            if (gap === -1) {
+                return;
+            }
+            desktop = createDesktop(gap);
+        }
+        moveWindowToDesktop(window, desktop);
+    }
+
+    // Karousel picks this up and moves the window to the desktop's grid, but it only lays out the current desktop,
+    // so switch to it and focus the window to have it placed next to the other windows there
+    function moveWindowToDesktop(window, desktop) {
+        window.desktops = [desktop];
+        focusWindow(window);
         selectedWindow = window;
-        rows.currentIndex = row.index;
+        rows.currentIndex = KWinComponents.Workspace.desktops.indexOf(desktop);
     }
 
     function handleKey(event) {
