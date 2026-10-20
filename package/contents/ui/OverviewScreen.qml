@@ -233,6 +233,44 @@ Item {
         }
     }
 
+    // vertical scrolling jumps one desktop at a time, horizontal scrolling pans the row under the pointer
+    Item {
+        anchors.fill: parent
+        z: 1
+        enabled: !searchResults.active
+
+        WheelHandler {
+            property real accumulatedY: 0
+
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: event => {
+                let deltaX = event.angleDelta.x;
+                let deltaY = event.angleDelta.y;
+                if (event.modifiers & Qt.ShiftModifier) {
+                    deltaX = deltaY;
+                    deltaY = 0;
+                }
+
+                if (deltaX !== 0) {
+                    const position = rows.mapFromItem(overview, point.position.x, point.position.y);
+                    const row = rows.itemAt(position.x + rows.contentX, position.y + rows.contentY) ?? rows.currentItem;
+                    row?.scrollBy(-deltaX);
+                }
+
+                if (Math.sign(deltaY) !== Math.sign(accumulatedY)) {
+                    accumulatedY = 0;
+                }
+                accumulatedY += deltaY;
+                // one mouse wheel notch is 120
+                if (Math.abs(accumulatedY) >= 120) {
+                    overview.selectRow(accumulatedY > 0 ? -1 : 1);
+                    accumulatedY = 0;
+                }
+                event.accepted = true;
+            }
+        }
+    }
+
     // panels stay where they are and fade out while zooming out
     Repeater {
         model: KWinComponents.WindowFilterModel {

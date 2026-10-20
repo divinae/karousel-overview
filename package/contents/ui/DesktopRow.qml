@@ -100,6 +100,10 @@ Item {
         }
     }
 
+    function scrollBy(delta) {
+        scrollTo(flick.contentX + delta);
+    }
+
     function centerOnViewport() {
         scrollTo(viewportFrame.x + viewportFrame.width / 2 - flick.width / 2);
     }
