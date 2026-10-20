@@ -12,7 +12,9 @@
         "EnabledByDefault": false,
         "Id": "karousel_overview",
         "Version": "0.1",
-        "License": "GPLv3"
+        "License": "GPLv3",
+        "Website": "https://github.com/divinae/karousel-overview",
+        "BugReportUrl": "https://github.com/divinae/karousel-overview/issues"
     },
     "X-Plasma-API": "declarativescript",
     "X-Plasma-API-Minimum-Version": "6.0",
