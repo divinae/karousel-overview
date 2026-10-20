@@ -580,14 +580,42 @@ Item {
             visible: row.stackHint !== null
         }
 
-        Rectangle {
-            x: row.insertHintX - width / 2
-            width: Kirigami.Units.smallSpacing
-            height: row.height
+        // where a dragged column goes: a glowing pill that slides between the columns and fades in and out
+        Kirigami.ShadowedRectangle {
+            id: insertHint
+
+            readonly property bool shown: !isNaN(row.insertHintX)
+            // stays where it was while fading out
+            property real hintX: 0
+
+            x: hintX - width / 2
+            y: row.height * 0.1
+            z: 100000
+            width: Kirigami.Units.smallSpacing * 1.5
+            height: row.height * 0.8
             radius: width / 2
             color: Kirigami.Theme.highlightColor
-            visible: !isNaN(row.insertHintX)
-            z: 100000
+            shadow.size: Kirigami.Units.gridUnit
+            shadow.color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.6)
+            opacity: shown ? 1 : 0
+            visible: opacity > 0
+
+            Connections {
+                target: row
+                function onInsertHintXChanged() {
+                    if (!isNaN(row.insertHintX)) {
+                        insertHint.hintX = row.insertHintX;
+                    }
+                }
+            }
+
+            Behavior on opacity {
+                NumberAnimation { duration: Kirigami.Units.shortDuration }
+            }
+            Behavior on hintX {
+                enabled: insertHint.shown
+                NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic }
+            }
         }
 
         Repeater {

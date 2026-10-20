@@ -368,21 +368,29 @@ Item {
         onDropped: (window, position, centerX, targetWindow) => overview.dropWindow(window, position, centerX, targetWindow)
     }
 
-    // shows where dropping a window between two rows creates a new desktop
-    Rectangle {
+    // shows where dropping a window between two rows creates a new desktop, styled like the column insertion hint
+    Kirigami.ShadowedRectangle {
         readonly property Item rowBelow: rows.itemAtIndex(dragController.hoveredGap)
+        readonly property bool shown: dragController.hoveredGap !== -1 && rowBelow !== null
 
-        x: Kirigami.Units.gridUnit
+        x: (overview.width - width) / 2
         y: {
             rows.contentY; // reposition while the rows move
             return rowBelow !== null ? rowBelow.mapToItem(overview, 0, 0).y - (rows.spacing + height) / 2 : 0;
         }
         z: 1
-        width: overview.width - 2 * Kirigami.Units.gridUnit
-        height: Kirigami.Units.smallSpacing
+        width: overview.width * 0.5
+        height: Kirigami.Units.smallSpacing * 1.5
         radius: height / 2
         color: Kirigami.Theme.highlightColor
-        visible: dragController.hoveredGap !== -1 && rowBelow !== null
+        shadow.size: Kirigami.Units.gridUnit
+        shadow.color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.6)
+        opacity: shown ? 1 : 0
+        visible: opacity > 0
+
+        Behavior on opacity {
+            NumberAnimation { duration: Kirigami.Units.shortDuration }
+        }
     }
 
     WheelNavigation {
