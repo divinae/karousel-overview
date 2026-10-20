@@ -10,7 +10,9 @@ set -e
 
 state="$(realpath -m "$1")"
 shift
-mkdir -p "$state/config" "$state/cache"
+mkdir -p "$state/config" "$state/cache" "$state/state" "$state/data"
+# the installed effect and Karousel, the rest of the data directory stays separate
+ln -sfn "${XDG_DATA_HOME:-$HOME/.local/share}/kwin" "$state/data/kwin"
 cat > "$state/config/kwinrc" <<CONFIG
 [Plugins]
 karouselEnabled=true
@@ -26,7 +28,7 @@ fi
 cat > "$state/session.sh" <<SESSION
 #!/bin/bash
 # D-Bus activated services, like kactivitymanagerd which Karousel needs for tiling, need the Wayland display
-dbus-update-activation-environment WAYLAND_DISPLAY XDG_CONFIG_HOME XDG_CACHE_HOME
+dbus-update-activation-environment WAYLAND_DISPLAY XDG_CONFIG_HOME XDG_CACHE_HOME XDG_STATE_HOME XDG_DATA_HOME
 qdbus6 org.kde.ActivityManager /ActivityManager/Activities org.kde.ActivityManager.Activities.CurrentActivity > /dev/null
 echo "\$DBUS_SESSION_BUS_ADDRESS" > "$state/bus"
 sleep 1
@@ -38,8 +40,12 @@ wait
 SESSION
 chmod +x "$state/session.sh"
 
+# its own config, cache, state and data, so that nothing in it changes the real session's files,
+# e.g. its kactivitymanagerd would otherwise save its own activity as the current one
 export XDG_CONFIG_HOME="$state/config"
 export XDG_CACHE_HOME="$state/cache"
+export XDG_STATE_HOME="$state/state"
+export XDG_DATA_HOME="$state/data"
 # log to stderr instead of the journal, so that the nested KWin's messages end up in its output
 export QT_FORCE_STDERR_LOGGING=1
 unset WAYLAND_DISPLAY DISPLAY
