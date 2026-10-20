@@ -40,6 +40,8 @@ Item {
     readonly property bool scrollsKarousel: overviewRoot.karouselAvailable && desktop !== null && desktop === overviewRoot.activeDesktop
     // Karousel's view is being moved to match the preview, the windows jump to where they already are in the preview
     property bool syncingScroll: false
+    // a window and where it was in the row when the sync started, kept there while Karousel moves the windows
+    property var syncAnchor: null
     readonly property bool showMinimized: effect.configuration.ShowMinimized && desktop !== null
     // where the minimized windows after the strip end, in the strip's coordinates, 0 when there are none
     property real minimizedEnd: 0
@@ -88,7 +90,16 @@ Item {
         }
         updateMinimized();
         // Karousel scrolling moves the windows, not the view, keep the view where it is
-        if (scrollsKarousel && overviewRoot.draggedWindow === null && !panning()) {
+        if (syncingScroll && syncAnchor !== null) {
+            // keep the windows where they were in the preview, then glide to where Karousel actually put them,
+            // which can be a bit off, e.g. because of the gaps or the ends of the strip
+            const anchor = thumbForWindow(syncAnchor.window);
+            if (anchor !== null) {
+                flick.contentX = anchor.layoutX - syncAnchor.x;
+            }
+            snapAnimation.to = Layout.clamp(viewportFrame.x + viewportFrame.width / 2 - flick.width / 2, minContentX(), maxContentX());
+            snapAnimation.restart();
+        } else if (scrollsKarousel && overviewRoot.draggedWindow === null && !panning()) {
             centerOnViewport();
         } else if (overviewRoot.selectedWindow !== null) {
             ensureWindowVisible(overviewRoot.selectedWindow);
@@ -286,6 +297,9 @@ Item {
             snapAnimation.restart();
             return;
         }
+        const anchor = thumbItems().reduce((best, thumb) => best === null
+            || Math.abs(thumb.layoutX - flick.contentX - viewportLeft) < Math.abs(best.layoutX - flick.contentX - viewportLeft) ? thumb : best, null);
+        syncAnchor = anchor === null ? null : { window: anchor.window, x: anchor.layoutX - flick.contentX };
         syncingScroll = true;
         syncTimer.restart();
         overviewRoot.scrollKarousel(steps);
@@ -368,7 +382,10 @@ Item {
     Timer {
         id: syncTimer
         interval: Kirigami.Units.longDuration * 2
-        onTriggered: row.syncingScroll = false
+        onTriggered: {
+            row.syncingScroll = false;
+            row.syncAnchor = null;
+        }
     }
 
     Timer {
