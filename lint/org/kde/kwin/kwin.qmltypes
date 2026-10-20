@@ -1,0 +1,177 @@
+import QtQuick.tooling 1.2
+
+// Only for qmllint: org.kde.kwin is registered inside KWin, so qmllint can't load it. This describes the part of it
+// that the effect uses; objects that KWin hands out (windows, desktops, outputs) are typed var in the effect instead.
+Module {
+    Component {
+        file: "sceneeffect.h"
+        name: "KWin::SceneEffect"
+        accessSemantics: "reference"
+        prototype: "QObject"
+        defaultProperty: "data"
+        exports: ["org.kde.kwin/SceneEffect 3.0"]
+        exportMetaObjectRevisions: [768]
+        Property { name: "data"; type: "QObject"; isList: true; isPointer: true }
+        Property { name: "visible"; type: "bool" }
+        Property { name: "delegate"; type: "QQmlComponent"; isPointer: true }
+        Property { name: "configuration"; type: "QVariant"; isReadonly: true }
+    }
+    Component {
+        file: "sceneeffect.h"
+        name: "KWin::SceneView"
+        accessSemantics: "reference"
+        prototype: "QObject"
+        exports: ["org.kde.kwin/SceneView 3.0"]
+        isCreatable: false
+        exportMetaObjectRevisions: [768]
+        attachedType: "KWin::SceneViewAttached"
+    }
+    Component {
+        file: "sceneeffect.h"
+        name: "KWin::SceneViewAttached"
+        accessSemantics: "reference"
+        prototype: "QObject"
+        Property { name: "screen"; type: "QVariant"; isReadonly: true }
+    }
+    Component {
+        file: "workspace_wrapper.h"
+        name: "KWin::QtScriptWorkspaceWrapper"
+        accessSemantics: "reference"
+        prototype: "QObject"
+        exports: ["org.kde.kwin/Workspace 3.0"]
+        isCreatable: false
+        isSingleton: true
+        exportMetaObjectRevisions: [768]
+        Property { name: "windows"; type: "QVariant"; isReadonly: true }
+        Property { name: "desktops"; type: "QVariant"; isReadonly: true }
+        Property { name: "currentDesktop"; type: "QVariant" }
+        Property { name: "currentActivity"; type: "QString" }
+        Property { name: "activeWindow"; type: "QVariant" }
+        Property { name: "screens"; type: "QVariant"; isReadonly: true }
+        Signal { name: "windowRemoved"; Parameter { name: "window"; type: "QVariant" } }
+        Signal { name: "windowActivated"; Parameter { name: "window"; type: "QVariant" } }
+        Signal { name: "currentDesktopChanged" }
+        Method {
+            name: "createDesktop"
+            Parameter { name: "position"; type: "int" }
+            Parameter { name: "name"; type: "QString" }
+        }
+        Method { name: "removeDesktop"; Parameter { name: "desktop"; type: "QVariant" } }
+        Enum { name: "ClientAreaOption"; values: ["PlacementArea", "MovementArea", "MaximizeArea", "MaximizeFullArea", "FullScreenArea", "WorkArea", "FullArea", "ScreenArea"] }
+        Method {
+            name: "clientArea"
+            type: "QRectF"
+            Parameter { name: "option"; type: "ClientAreaOption" }
+            Parameter { name: "output"; type: "QVariant" }
+            Parameter { name: "desktop"; type: "QVariant" }
+        }
+        Method { name: "currentDesktopForScreen"; type: "QVariant"; Parameter { name: "screen"; type: "QVariant" } }
+        Method {
+            name: "setCurrentDesktopForScreen"
+            Parameter { name: "desktop"; type: "QVariant" }
+            Parameter { name: "screen"; type: "QVariant" }
+        }
+    }
+    Component {
+        file: "windowthumbnailitem.h"
+        name: "KWin::WindowThumbnailItem"
+        accessSemantics: "reference"
+        prototype: "QQuickItem"
+        exports: ["org.kde.kwin/WindowThumbnail 3.0"]
+        exportMetaObjectRevisions: [768]
+        Property { name: "wId"; type: "QVariant" }
+    }
+    Component {
+        file: "desktopbackgrounditem.h"
+        name: "KWin::DesktopBackgroundItem"
+        accessSemantics: "reference"
+        prototype: "QQuickItem"
+        exports: ["org.kde.kwin/DesktopBackground 3.0"]
+        exportMetaObjectRevisions: [768]
+        Property { name: "activity"; type: "QString" }
+        Property { name: "desktop"; type: "QVariant" }
+        Property { name: "outputName"; type: "QString" }
+    }
+    Component {
+        file: "windowmodel.h"
+        name: "KWin::WindowModel"
+        accessSemantics: "reference"
+        prototype: "QAbstractItemModel"
+        exports: ["org.kde.kwin/WindowModel 3.0"]
+        exportMetaObjectRevisions: [768]
+    }
+    Component {
+        file: "windowmodel.h"
+        name: "KWin::WindowFilterModel"
+        accessSemantics: "reference"
+        prototype: "QAbstractItemModel"
+        exports: ["org.kde.kwin/WindowFilterModel 3.0"]
+        exportMetaObjectRevisions: [768]
+        Enum {
+            name: "WindowType"
+            values: ["Normal", "Dialog", "Dock", "Desktop", "Notification", "CriticalNotification"]
+        }
+        Property { name: "windowModel"; type: "QVariant" }
+        Property { name: "activity"; type: "QString" }
+        Property { name: "desktop"; type: "QVariant" }
+        Property { name: "filter"; type: "QString" }
+        Property { name: "screenName"; type: "QString" }
+        Property { name: "minimizedWindows"; type: "bool" }
+        Property { name: "windowType"; type: "int" }
+    }
+    Component {
+        file: "shortcuthandler.h"
+        name: "KWin::ShortcutHandler"
+        accessSemantics: "reference"
+        prototype: "QObject"
+        exports: ["org.kde.kwin/ShortcutHandler 3.0"]
+        exportMetaObjectRevisions: [768]
+        Property { name: "name"; type: "QString" }
+        Property { name: "text"; type: "QString" }
+        Property { name: "sequence"; type: "QVariant" }
+        Signal { name: "activated" }
+    }
+    Component {
+        file: "screenedgehandler.h"
+        name: "KWin::ScreenEdgeHandler"
+        accessSemantics: "reference"
+        prototype: "QObject"
+        exports: ["org.kde.kwin/ScreenEdgeHandler 3.0"]
+        exportMetaObjectRevisions: [768]
+        Enum { name: "Mode"; values: ["Pointer", "Touch"] }
+        Property { name: "mode"; type: "int" }
+        Property { name: "edge"; type: "int" }
+        Signal { name: "activated" }
+    }
+    Component {
+        file: "gesturehandler.h"
+        name: "KWin::SwipeGestureHandler"
+        accessSemantics: "reference"
+        prototype: "QObject"
+        exports: ["org.kde.kwin/SwipeGestureHandler 3.0"]
+        exportMetaObjectRevisions: [768]
+        Enum { name: "Direction"; isScoped: true; values: ["Invalid", "Down", "Left", "Up", "Right"] }
+        Property { name: "direction"; type: "int" }
+        Property { name: "fingerCount"; type: "int" }
+        Property { name: "progress"; type: "double"; isReadonly: true; notify: "progressChanged" }
+        Signal { name: "progressChanged" }
+        Signal { name: "activated" }
+        Signal { name: "cancelled" }
+    }
+    Component {
+        file: "dbuscall.h"
+        name: "KWin::DBusCall"
+        accessSemantics: "reference"
+        prototype: "QObject"
+        exports: ["org.kde.kwin/DBusCall 3.0"]
+        exportMetaObjectRevisions: [768]
+        Property { name: "service"; type: "QString" }
+        Property { name: "path"; type: "QString" }
+        Property { name: "dbusInterface"; type: "QString" }
+        Property { name: "method"; type: "QString" }
+        Property { name: "arguments"; type: "QVariant" }
+        Method { name: "call" }
+        Signal { name: "finished"; Parameter { name: "returnValue"; type: "QVariant" } }
+        Signal { name: "failed" }
+    }
+}

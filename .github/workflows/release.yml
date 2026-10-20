@@ -1,0 +1,36 @@
+name: Release
+
+# pushing a tag like v0.4 publishes that version, with its section of the changelog as the notes
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed git make nodejs qt6-declarative qt6-shadertools qt6-5compat kirigami milou libplasma github-cli
+      - uses: actions/checkout@v4
+      - name: Tag matches the package's version
+        run: |
+          version="$(grep '"Version":' package/metadata.json | grep -o '[0-9.]*')"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+              echo "The tag $GITHUB_REF_NAME doesn't match version $version in package/metadata.json"
+              exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Package
+        # runs the lint and the tests first
+        run: make package
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          tools/release-notes.sh "$VERSION" > notes.md
+          gh release create "$GITHUB_REF_NAME" karousel_overview_*.tar.gz --title "$VERSION" --notes-file notes.md

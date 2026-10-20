@@ -11,9 +11,12 @@ jobs:
     container: archlinux:latest
     steps:
       - name: Install dependencies
-        run: pacman -Syu --noconfirm --needed git make nodejs qt6-declarative
+        run: pacman -Syu --noconfirm --needed git make nodejs qt6-declarative qt6-shadertools qt6-5compat kirigami milou libplasma
       - uses: actions/checkout@v4
       - name: Lint
         run: make lint
       - name: Test
         run: make test
+      # only that they compile, the output may differ between versions of Qt's shader tools
+      - name: Shaders compile
+        run: make shaders
