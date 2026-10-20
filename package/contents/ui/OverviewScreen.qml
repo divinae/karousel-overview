@@ -124,14 +124,18 @@ Item {
         dragPosition = overview.mapFromItem(null, scenePosition.x, scenePosition.y);
     }
 
+    function rowAt(point) {
+        const position = rows.mapFromItem(overview, point.x, point.y);
+        return rows.itemAt(position.x + rows.contentX, position.y + rows.contentY);
+    }
+
     function endDrag() {
         const window = draggedWindow;
         draggedWindow = null;
         if (window === null) {
             return;
         }
-        const position = rows.mapFromItem(overview, dragPosition.x, dragPosition.y);
-        const row = rows.itemAt(position.x + rows.contentX, position.y + rows.contentY);
+        const row = rowAt(dragPosition);
         if (row === null) {
             return;
         }
@@ -144,6 +148,58 @@ Item {
         window.desktops = [row.desktop ?? createDesktop()];
         selectedWindow = window;
         rows.currentIndex = row.index;
+    }
+
+    // while dragging a window, pushing it against the left or right edge scrolls the row under it
+    Timer {
+        interval: 16
+        repeat: true
+        running: overview.draggedWindow !== null
+        onTriggered: {
+            const zone = Kirigami.Units.gridUnit * 4;
+            const x = overview.dragPosition.x;
+            let delta = 0;
+            if (x < zone) {
+                delta = -(1 - x / zone);
+            } else if (x > overview.width - zone) {
+                delta = 1 - (overview.width - x) / zone;
+            }
+            if (delta !== 0) {
+                overview.rowAt(overview.dragPosition)?.scrollBy(delta * Kirigami.Units.gridUnit * 1.5);
+            }
+        }
+    }
+
+    // while dragging a window, pushing it against the top or bottom edge moves between rows
+    Timer {
+        interval: 500
+        repeat: true
+        running: overview.draggedWindow !== null
+        onTriggered: {
+            const zone = Kirigami.Units.gridUnit * 3;
+            const y = overview.dragPosition.y;
+            if (y < zone) {
+                rows.currentIndex = Math.max(0, rows.currentIndex - 1);
+            } else if (y > overview.height - zone) {
+                rows.currentIndex = Math.min(rows.count - 1, rows.currentIndex + 1);
+            }
+        }
+    }
+
+    // while dragging a window, holding it over another desktop switches to that desktop
+    property Item dragHoverRow: draggedWindow !== null ? rowAt(dragPosition) : null
+    onDragHoverRowChanged: dragHoverTimer.restart()
+    Timer {
+        id: dragHoverTimer
+        interval: 700
+        onTriggered: {
+            const row = overview.dragHoverRow;
+            if (row === null || row.desktop === null || row.desktop === overview.currentDesktop()) {
+                return;
+            }
+            KWinComponents.Workspace.setCurrentDesktopForScreen(row.desktop, overview.targetScreen);
+            rows.currentIndex = row.index;
+        }
     }
 
     KWinComponents.DBusCall {
@@ -255,6 +311,7 @@ Item {
                     const position = rows.mapFromItem(overview, point.position.x, point.position.y);
                     const row = rows.itemAt(position.x + rows.contentX, position.y + rows.contentY) ?? rows.currentItem;
                     row?.scrollBy(-deltaX);
+                    row?.scheduleSnap();
                 }
 
                 if (Math.sign(deltaY) !== Math.sign(accumulatedY)) {

@@ -98,12 +98,38 @@ Item {
         }
     }
 
+    function maxContentX() {
+        return Math.max(0, flick.contentWidth - flick.width);
+    }
+
     function scrollTo(contentX) {
+        snapAnimation.stop();
         if (flick.contentWidth <= flick.width) {
             flick.contentX = -flick.leftMargin;
         } else {
-            flick.contentX = Math.max(0, Math.min(contentX, flick.contentWidth - flick.width));
+            flick.contentX = Math.max(0, Math.min(contentX, maxContentX()));
         }
+    }
+
+    // settles the row so that the column closest to its left edge lines up with it
+    function snapToColumn() {
+        if (flick.contentWidth <= flick.width || columns.length === 0 || panHandler.active || flick.moving) {
+            return;
+        }
+        const left = flick.contentX + padding;
+        let closest = null;
+        for (const column of columns) {
+            const x = toStripX(column.x);
+            if (closest === null || Math.abs(x - left) < Math.abs(closest - left)) {
+                closest = x;
+            }
+        }
+        snapAnimation.to = Math.max(0, Math.min(closest - padding, maxContentX()));
+        snapAnimation.restart();
+    }
+
+    function scheduleSnap() {
+        snapTimer.restart();
     }
 
     function scrollBy(delta) {
@@ -171,6 +197,57 @@ Item {
         }
     }
 
+    NumberAnimation {
+        id: snapAnimation
+        target: flick
+        property: "contentX"
+        duration: Kirigami.Units.longDuration
+        easing.type: Easing.OutCubic
+    }
+
+    // waits for a series of scroll events to end
+    Timer {
+        id: snapTimer
+        interval: 200
+        onTriggered: row.snapToColumn()
+    }
+
+    // right-click and drag pans the row, also over windows, and keeps going after release like a flick
+    DragHandler {
+        id: panHandler
+
+        property real startContentX: 0
+        property real lastVelocity: 0
+
+        target: null
+        acceptedButtons: Qt.RightButton
+        yAxis.enabled: false
+        grabPermissions: PointerHandler.CanTakeOverFromAnything
+
+        onActiveChanged: {
+            if (active) {
+                snapAnimation.stop();
+                flick.cancelFlick();
+                startContentX = flick.contentX;
+                lastVelocity = 0;
+            } else if (Math.abs(lastVelocity) > 100) {
+                flick.flick(lastVelocity, 0);
+            } else {
+                row.snapToColumn();
+            }
+        }
+        onTranslationChanged: {
+            if (active) {
+                row.scrollTo(startContentX - translation.x);
+            }
+        }
+        onCentroidChanged: {
+            if (active) {
+                lastVelocity = centroid.velocity.x;
+            }
+        }
+    }
+
     KWinComponents.WindowFilterModel {
         id: windowFilterModel
         activity: KWinComponents.Workspace.currentActivity
@@ -202,6 +279,9 @@ Item {
         contentHeight: height
         // center strips that are narrower than the row
         leftMargin: Math.max(0, (width - contentWidth) / 2)
+
+        onMovementEnded: row.snapToColumn()
+        onFlickEnded: row.snapToColumn()
 
         Item {
             width: flick.contentWidth
