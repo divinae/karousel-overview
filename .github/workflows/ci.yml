@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # Arch has the Qt and KDE versions the effect is written for
+    container: archlinux:latest
+    steps:
+      - name: Install dependencies
+        run: pacman -Syu --noconfirm --needed git make nodejs qt6-declarative
+      - uses: actions/checkout@v4
+      - name: Lint
+        run: make lint
+      - name: Test
+        run: make test
