@@ -28,3 +28,12 @@ After updating, restart KWin (or log out and back in) to load the new version.
 - With multiple screens, each screen only shows the windows that are on it (Karousel itself doesn't support multiple screens)
 - The 4-finger swipe clashes with Plasma's own Overview effect
 - Desktops other than the current one show their windows where Karousel last placed them
+
+## Development
+KWin caches QML per file path, so a new version of the effect only loads after restarting KWin, and restarting the real KWin also restarts Xwayland, which kills X11 apps.
+Instead, `make nested` installs the effect and starts a headless KWin with its own D-Bus session and config, with Karousel and the effect enabled and a few windows open.
+Run commands in it with `tools/nested-run.sh`, for example:
+```sh
+tools/nested-run.sh /tmp/karousel-overview-nested qdbus6 org.kde.kglobalaccel /component/kwin org.kde.kglobalaccel.Component.invokeShortcut "Karousel Overview"
+tools/nested-run.sh /tmp/karousel-overview-nested spectacle -b -n -f -o overview.png
+```

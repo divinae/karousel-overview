@@ -14,3 +14,9 @@ uninstall:
 
 package: lint
 	tar -czf ./karousel_overview_${subst .,_,${VERSION}}.tar.gz ./package --transform s/package/karousel_overview/
+
+# headless KWin with its own D-Bus session and config, for testing without restarting the real KWin
+NESTED_STATE ?= /tmp/karousel-overview-nested
+nested: install
+	rm -rf $(NESTED_STATE)
+	./tools/nested.sh $(NESTED_STATE)
