@@ -4,6 +4,7 @@
 # version of the effect also restarts Xwayland, which kills X11 apps.
 #
 # Usage: tools/nested.sh <state dir> [applications...]
+# With WINDOWED=1 it runs in a window of the current Wayland session instead, to try it with the mouse and keyboard.
 # The nested session's D-Bus address is written to <state dir>/bus, use it with
 # tools/nested-run.sh.
 set -e
@@ -17,6 +18,21 @@ cat > "$state/config/kwinrc" <<CONFIG
 [Plugins]
 karouselEnabled=true
 karousel_overviewEnabled=true
+# Plasma's own overview takes the top-left corner by default
+overviewEnabled=false
+
+# pressing Meta alone toggles the overview
+[ModifierOnlyShortcuts]
+Meta=org.kde.kglobalaccel,/component/kwin,org.kde.kglobalaccel.Component,invokeShortcut,Karousel Overview
+
+# so does the top-left corner, the shortcuts may not reach a windowed nested KWin
+[Effect-karousel_overview]
+BorderActivate=7
+CONFIG
+# the real session's KWin takes the shortcuts with Meta before the nested one gets them, so add one without it
+cat > "$state/config/kglobalshortcutsrc" <<'CONFIG'
+[kwin]
+Karousel Overview=Meta+F\tMeta+Ctrl+O\tCtrl+Alt+O,Meta+Ctrl+O,Karousel: Toggle overview
 CONFIG
 
 apps=("$@")
@@ -48,7 +64,14 @@ export XDG_STATE_HOME="$state/state"
 export XDG_DATA_HOME="$state/data"
 # log to stderr instead of the journal, so that the nested KWin's messages end up in its output
 export QT_FORCE_STDERR_LOGGING=1
-unset WAYLAND_DISPLAY DISPLAY
+unset DISPLAY
+backend=(--virtual)
+if [ "${WINDOWED:-0}" = 1 ]; then
+    # KWin opens a window on the session's Wayland display
+    backend=(--wayland-display "$WAYLAND_DISPLAY")
+else
+    unset WAYLAND_DISPLAY
+fi
 
-exec dbus-run-session -- kwin_wayland --virtual --width 1920 --height 1080 --no-lockscreen \
+exec dbus-run-session -- kwin_wayland "${backend[@]}" --width 1920 --height 1080 --no-lockscreen \
     --socket wayland-karousel-overview "$state/session.sh"

@@ -15,7 +15,7 @@ The effect doesn't talk to Karousel directly: Karousel keeps off-screen columns 
 - Minimized windows are shown dimmed at the end of their desktop, click one to restore it
 - Translucent windows, like Konsole, get the blurred wallpaper behind them, since KWin's blur doesn't apply to window previews
 - Drop a window between two desktops to create a new desktop there
-- Double-click a desktop's name to rename it, hover the name of an empty desktop to remove it
+- Double-click a desktop's label to rename it, hover the label of an empty desktop to remove it
 - Middle-click a window or use its close button to close it
 - Type to filter windows by name; if nothing matches, KRunner results are shown
 - Scroll vertically to jump between desktops, scroll horizontally (or Shift+scroll) to move a desktop's windows past its wallpaper, which stays in place
@@ -40,6 +40,7 @@ After updating, restart KWin (or log out and back in) to load the new version.
 KWin caches QML per file path, so a new version of the effect only loads after restarting KWin, and restarting the real KWin also restarts Xwayland, which kills X11 apps.
 Instead, `make nested` installs the effect and starts a headless KWin with its own D-Bus session and config, with Karousel and the effect enabled and a few windows open.
 `make test` runs the unit tests of the layout logic in `layout.js` with node.
+`WINDOWED=1 tools/nested.sh <state dir>` runs it in a window of the current session instead, to try it with the mouse; there the top-left corner and Ctrl+Alt+O toggle the overview, since the real session takes the shortcuts with Meta.
 Run commands in the nested KWin with `tools/nested-run.sh`, for example:
 ```sh
 tools/nested-run.sh /tmp/karousel-overview-nested qdbus6 org.kde.kglobalaccel /component/kwin org.kde.kglobalaccel.Component.invokeShortcut "Karousel Overview"
