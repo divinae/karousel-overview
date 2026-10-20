@@ -11,6 +11,15 @@
             <min>20</min>
             <max>90</max>
         </entry>
+        <entry name="TouchpadGesture" type="Bool">
+            <label>Open and close the overview with a vertical touchpad swipe</label>
+            <default>false</default>
+        </entry>
+        <entry name="GestureFingerCount" type="Int">
+            <default>4</default>
+            <min>3</min>
+            <max>4</max>
+        </entry>
         <entry name="BorderActivate" type="IntList" />
         <entry name="TouchBorderActivate" type="IntList" />
     </group>

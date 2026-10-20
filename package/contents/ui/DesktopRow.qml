@@ -5,6 +5,7 @@ import org.kde.kwin as KWinComponents
 Item {
     id: row
 
+    // null for the row that creates a new desktop
     required property QtObject desktop
     required property Item overviewRoot
     property bool selected: false
@@ -17,6 +18,9 @@ Item {
     // Karousel keeps off-screen columns at their real positions
     property real stripMinX: screenGeometry.x
     property real stripMaxX: screenGeometry.x + screenGeometry.width
+    // windows grouped by column, sorted from left to right
+    property var columns: []
+    readonly property int windowCount: thumbs.count
 
     function toStripX(x) {
         return (x - stripMinX) * thumbScale + padding;
@@ -25,13 +29,26 @@ Item {
     function updateBounds() {
         let minX = screenGeometry.x;
         let maxX = screenGeometry.x + screenGeometry.width;
+        const columnMap = new Map();
         for (const thumb of thumbItems()) {
             const geometry = thumb.window.frameGeometry;
             minX = Math.min(minX, geometry.x);
             maxX = Math.max(maxX, geometry.x + geometry.width);
+
+            // windows in the same Karousel column share x and width
+            const key = Math.round(geometry.x) + ":" + Math.round(geometry.width);
+            const column = columnMap.get(key);
+            if (column === undefined) {
+                columnMap.set(key, { x: geometry.x, y: geometry.y, width: geometry.width, bottom: geometry.y + geometry.height, windows: [thumb.window] });
+            } else {
+                column.y = Math.min(column.y, geometry.y);
+                column.bottom = Math.max(column.bottom, geometry.y + geometry.height);
+                column.windows.push(thumb.window);
+            }
         }
         stripMinX = minX;
         stripMaxX = maxX;
+        columns = Array.from(columnMap.values()).sort((a, b) => a.x - b.x);
     }
 
     function thumbItems() {
@@ -46,8 +63,33 @@ Item {
         return items;
     }
 
+    function thumbForWindow(window) {
+        return thumbItems().find(thumb => thumb.window === window) ?? null;
+    }
+
     function hasWindow(window) {
-        return thumbItems().some(thumb => thumb.window === window);
+        return thumbForWindow(window) !== null;
+    }
+
+    function viewportFramePosition(item) {
+        return viewportFrame.mapToItem(item, 0, 0);
+    }
+
+    function reorderColumn(window, overviewX) {
+        const source = columns.findIndex(column => column.windows.includes(window));
+        if (source === -1) {
+            return;
+        }
+        const dropX = flick.contentItem.mapFromItem(overviewRoot, overviewX, 0).x;
+        let target = 0;
+        columns.forEach((column, i) => {
+            if (i !== source && toStripX(column.x + column.width / 2) < dropX) {
+                target++;
+            }
+        });
+        if (target !== source) {
+            overviewRoot.moveColumn(window, target - source);
+        }
     }
 
     function scrollTo(contentX) {
@@ -60,6 +102,13 @@ Item {
 
     function centerOnViewport() {
         scrollTo(viewportFrame.x + viewportFrame.width / 2 - flick.width / 2);
+    }
+
+    function centerOnWindow(window) {
+        const thumb = thumbForWindow(window);
+        if (thumb !== null) {
+            scrollTo(thumb.x + thumb.width / 2 - flick.width / 2);
+        }
     }
 
     function ensureVisible(item) {
@@ -101,10 +150,24 @@ Item {
         }
     }
 
+    KWinComponents.WindowFilterModel {
+        id: windowFilterModel
+        activity: KWinComponents.Workspace.currentActivity
+        desktop: row.desktop
+        filter: row.overviewRoot.searchText
+        minimizedWindows: false
+        windowType: ~KWinComponents.WindowFilterModel.Dock &
+                    ~KWinComponents.WindowFilterModel.Desktop &
+                    ~KWinComponents.WindowFilterModel.Notification &
+                    ~KWinComponents.WindowFilterModel.CriticalNotification
+        windowModel: KWinComponents.WindowModel {}
+    }
+
     Rectangle {
         anchors.fill: parent
         color: Qt.rgba(1, 1, 1, row.selected ? 0.08 : 0.03)
         radius: Kirigami.Units.cornerRadius
+        opacity: row.overviewRoot.zoom
     }
 
     Flickable {
@@ -138,20 +201,31 @@ Item {
             radius: Kirigami.Units.cornerRadius
             border.width: 2
             border.color: Qt.rgba(1, 1, 1, row.selected ? 0.5 : 0.2)
+            opacity: row.overviewRoot.zoom
+        }
+
+        // frames around columns with more than one window
+        Repeater {
+            model: row.columns.filter(column => column.windows.length > 1)
+
+            Rectangle {
+                required property var modelData
+
+                x: row.toStripX(modelData.x) - Kirigami.Units.smallSpacing
+                y: (modelData.y - row.screenGeometry.y) * row.thumbScale - Kirigami.Units.smallSpacing
+                width: modelData.width * row.thumbScale + 2 * Kirigami.Units.smallSpacing
+                height: (modelData.bottom - modelData.y) * row.thumbScale + 2 * Kirigami.Units.smallSpacing
+                color: Qt.rgba(1, 1, 1, 0.05)
+                radius: Kirigami.Units.cornerRadius
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.3)
+                opacity: row.overviewRoot.zoom
+            }
         }
 
         Repeater {
             id: thumbs
-            model: KWinComponents.WindowFilterModel {
-                activity: KWinComponents.Workspace.currentActivity
-                desktop: row.desktop
-                minimizedWindows: false
-                windowType: ~KWinComponents.WindowFilterModel.Dock &
-                            ~KWinComponents.WindowFilterModel.Desktop &
-                            ~KWinComponents.WindowFilterModel.Notification &
-                            ~KWinComponents.WindowFilterModel.CriticalNotification
-                windowModel: KWinComponents.WindowModel {}
-            }
+            model: row.desktop !== null ? windowFilterModel : null
 
             delegate: WindowThumb {
                 strip: row
@@ -164,13 +238,22 @@ Item {
     }
 
     Text {
+        anchors.centerIn: parent
+        visible: row.desktop === null
+        text: "+"
+        color: "white"
+        opacity: (row.selected ? 0.8 : 0.4) * row.overviewRoot.zoom
+        font.pointSize: Kirigami.Theme.defaultFont.pointSize * 4
+    }
+
+    Text {
         anchors.left: parent.left
         anchors.bottom: parent.top
         anchors.leftMargin: row.padding
         anchors.bottomMargin: Kirigami.Units.smallSpacing
-        text: row.desktop.name
+        text: row.desktop !== null ? row.desktop.name : "New desktop"
         color: "white"
-        opacity: row.selected ? 1 : 0.6
+        opacity: (row.selected ? 1 : 0.6) * row.overviewRoot.zoom
     }
 
     Component.onCompleted: {

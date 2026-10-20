@@ -6,6 +6,8 @@ KWinComponents.SceneEffect {
     id: effect
 
     property bool activated: false
+    property bool gestureInProgress: false
+    property real partialActivationFactor: 0
     readonly property int animationDuration: Kirigami.Units.longDuration
 
     delegate: OverviewScreen {}
@@ -33,6 +35,37 @@ KWinComponents.SceneEffect {
         text: "Karousel: Toggle overview"
         sequence: "Meta+Ctrl+O"
         onActivated: effect.toggle()
+    }
+
+    // touchpad swipe up opens the overview, swipe down closes it, following the fingers
+    Instantiator {
+        model: effect.configuration.TouchpadGesture ? 1 : 0
+
+        QtObject {
+            readonly property QtObject openGesture: KWinComponents.SwipeGestureHandler {
+                direction: KWinComponents.SwipeGestureHandler.Direction.Up
+                fingerCount: effect.configuration.GestureFingerCount
+                onProgressChanged: {
+                    if (!effect.activated) {
+                        effect.partialActivate(progress);
+                    }
+                }
+                onActivated: effect.finishGesture(true)
+                onCancelled: effect.finishGesture(effect.activated)
+            }
+
+            readonly property QtObject closeGesture: KWinComponents.SwipeGestureHandler {
+                direction: KWinComponents.SwipeGestureHandler.Direction.Down
+                fingerCount: effect.configuration.GestureFingerCount
+                onProgressChanged: {
+                    if (effect.activated) {
+                        effect.partialActivate(1 - progress);
+                    }
+                }
+                onActivated: effect.finishGesture(false)
+                onCancelled: effect.finishGesture(effect.activated)
+            }
+        }
     }
 
     Timer {
@@ -63,5 +96,25 @@ KWinComponents.SceneEffect {
         }
         activated = false;
         deactivateTimer.start();
+    }
+
+    function partialActivate(factor) {
+        if (deactivateTimer.running) {
+            return;
+        }
+        visible = true;
+        gestureInProgress = true;
+        partialActivationFactor = factor;
+    }
+
+    function finishGesture(open) {
+        if (!gestureInProgress) {
+            return;
+        }
+        gestureInProgress = false;
+        activated = true;
+        if (!open) {
+            deactivate();
+        }
     }
 }

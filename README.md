@@ -5,13 +5,16 @@ It shows all virtual desktops stacked vertically, each one as a zoomed-out horiz
 The effect doesn't talk to Karousel directly: Karousel keeps off-screen columns at their real positions, so the strips are rebuilt from window geometry. It works without Karousel too, it just shows windows where they are.
 
 ## Usage
-- Toggle with Meta+Ctrl+O, or bind it to a screen edge in System Settings → Screen Edges
+- Toggle with Meta+Ctrl+O, a screen edge (System Settings → Screen Edges) or a touchpad swipe up (enable in the effect's settings)
 - Click a window to focus it, or click an empty part of a desktop to switch to it
-- Drag a window to another desktop to move it there
+- Drag a window to another desktop to move it there, or to the "New desktop" row to create one
+- Drag a window sideways within its desktop to reorder its column (uses Karousel's "Move column left/right" key bindings)
+- Middle-click a window or use its close button to close it
+- Type to filter windows by name; if nothing matches, KRunner results are shown
 - Scroll or drag horizontally to pan a desktop's strip, scroll vertically to switch desktops
-- Arrow keys select a window, Enter focuses it, Escape closes the overview
+- Arrow keys select a window, Enter focuses it, Delete closes it, Escape clears the search or closes the overview
 
-The height of the desktop rows can be changed in the effect's settings.
+The height of the desktop rows, and the touchpad gesture, can be changed in the effect's settings.
 
 ## Installation
 Requires Plasma 6.
@@ -20,5 +23,6 @@ Clone the repo and run `make install`, then enable "Karousel Overview" in System
 After updating, restart KWin (or log out and back in) to load the new version.
 
 ## Limitations
-- Multiple screens aren't supported (neither does Karousel)
+- With multiple screens, each screen only shows the windows that are on it (Karousel itself doesn't support multiple screens)
+- The 4-finger swipe clashes with Plasma's own Overview effect
 - Desktops other than the current one show their windows where Karousel last placed them

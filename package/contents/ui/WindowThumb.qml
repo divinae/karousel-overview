@@ -11,16 +11,18 @@ Item {
 
     readonly property rect geometry: window.frameGeometry
     readonly property bool selected: overviewRoot.selectedWindow === window
+    readonly property bool showControls: hover.hovered && overviewRoot.draggedWindow === null && overviewRoot.zoom === 1
 
     x: strip.toStripX(geometry.x)
     y: (geometry.y - strip.screenGeometry.y) * strip.thumbScale
     width: geometry.width * strip.thumbScale
     height: geometry.height * strip.thumbScale
     z: window.stackingOrder
-    visible: window.normalWindow
+    visible: window.normalWindow && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen)
     opacity: overviewRoot.draggedWindow === window ? 0.3 : 1
 
     onGeometryChanged: strip.updateBounds()
+    onVisibleChanged: strip.updateBounds()
 
     KWinComponents.WindowThumbnail {
         anchors.fill: parent
@@ -35,7 +37,7 @@ Item {
         border.width: 3
         border.color: Kirigami.Theme.highlightColor
         visible: thumb.selected || hover.hovered
-        opacity: thumb.selected ? 1 : 0.5
+        opacity: (thumb.selected ? 1 : 0.5) * thumb.overviewRoot.zoom
     }
 
     Rectangle {
@@ -46,7 +48,7 @@ Item {
         height: caption.implicitHeight + Kirigami.Units.smallSpacing
         radius: Kirigami.Units.cornerRadius
         color: Qt.rgba(0, 0, 0, 0.7)
-        visible: hover.hovered && thumb.overviewRoot.draggedWindow === null
+        visible: thumb.showControls
 
         Text {
             id: caption
@@ -58,6 +60,31 @@ Item {
         }
     }
 
+    Rectangle {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: Kirigami.Units.smallSpacing
+        width: Kirigami.Units.iconSizes.smallMedium
+        height: width
+        radius: width / 2
+        color: closeHover.hovered ? "#da4453" : Qt.rgba(0, 0, 0, 0.7)
+        visible: thumb.showControls && thumb.window.closeable
+
+        Text {
+            anchors.centerIn: parent
+            text: "✕"
+            color: "white"
+        }
+
+        HoverHandler {
+            id: closeHover
+        }
+
+        TapHandler {
+            onTapped: thumb.window.closeWindow()
+        }
+    }
+
     HoverHandler {
         id: hover
     }
@@ -66,8 +93,12 @@ Item {
         onTapped: thumb.overviewRoot.activateWindow(thumb.window)
     }
 
+    TapHandler {
+        acceptedButtons: Qt.MiddleButton
+        onTapped: thumb.window.closeWindow()
+    }
+
     DragHandler {
-        id: drag
         target: null
         // don't let the Flickables steal the drag
         grabPermissions: PointerHandler.CanTakeOverFromAnything

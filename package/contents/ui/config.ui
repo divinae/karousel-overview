@@ -35,7 +35,47 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="0" colspan="2">
+   <item row="1" column="0">
+    <widget class="QLabel" name="labelGesture">
+     <property name="text">
+      <string>Touchpad gesture:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="QCheckBox" name="kcfg_TouchpadGesture">
+     <property name="text">
+      <string>Swipe up to open, down to close</string>
+     </property>
+     <property name="toolTip">
+      <string>With 4 fingers, this clashes with Plasma's own Overview effect, which uses the same gesture</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel" name="labelFingers">
+     <property name="text">
+      <string>Fingers:</string>
+     </property>
+     <property name="buddy">
+      <cstring>kcfg_GestureFingerCount</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="1">
+    <widget class="QSpinBox" name="kcfg_GestureFingerCount">
+     <property name="minimum">
+      <number>3</number>
+     </property>
+     <property name="maximum">
+      <number>4</number>
+     </property>
+     <property name="value">
+      <number>4</number>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0" colspan="2">
     <widget class="QLabel" name="labelScreenEdges">
      <property name="text">
       <string>Screen edges that toggle the overview can be set in System Settings, under Screen Edges.</string>
