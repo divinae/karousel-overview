@@ -403,7 +403,7 @@ Item {
     Flickable {
         id: flick
         anchors.fill: parent
-        clip: true
+        // not clipped, so that the wallpaper's shadow shows above and below the row
         flickableDirection: Flickable.HorizontalFlick
         boundsBehavior: Flickable.StopAtBounds
         // the current desktop's row follows Karousel's view instead
@@ -425,6 +425,19 @@ Item {
             }
         }
 
+        // a shadow under the wallpaper instead of a frame around it
+        Kirigami.ShadowedRectangle {
+            x: viewportFrame.x
+            width: viewportFrame.width
+            height: row.height
+            // behind the wallpaper, only seen while it loads
+            color: Kirigami.Theme.backgroundColor
+            shadow.size: Kirigami.Units.gridUnit * 1.5
+            shadow.color: Qt.rgba(0, 0, 0, row.selected ? 0.5 : 0.3)
+            opacity: row.overviewRoot.zoom
+            visible: row.desktop !== null
+        }
+
         // the desktop's own wallpaper behind the part of the strip that is visible on screen, like Niri's workspaces
         Item {
             x: viewportFrame.x
@@ -444,17 +457,12 @@ Item {
             }
         }
 
-        // the part of the strip that is visible on screen
-        Rectangle {
+        // the part of the strip that is visible on screen, where the wallpaper and its shadow go, not drawn itself
+        Item {
             id: viewportFrame
             x: row.toStripX(row.screenGeometry.x)
             width: row.screenGeometry.width * row.thumbScale
             height: row.height
-            color: "transparent"
-            radius: Kirigami.Units.cornerRadius
-            border.width: 2
-            border.color: row.style.foregroundAlpha(row.selected ? 0.5 : 0.2)
-            opacity: row.overviewRoot.zoom
         }
 
         // frames around columns with more than one window
