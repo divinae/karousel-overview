@@ -13,6 +13,12 @@ Item {
     readonly property rect screenGeometry: overviewRoot.screenGeometry
     readonly property real thumbScale: overviewRoot.thumbScale
     readonly property real padding: Kirigami.Units.gridUnit
+    // the overview's underlay uses the theme's background color, so draw on top of it with its text color
+    readonly property color foreground: Kirigami.Theme.textColor
+
+    function foregroundAlpha(alpha) {
+        return Qt.rgba(foreground.r, foreground.g, foreground.b, alpha);
+    }
 
     // horizontal extent of the strip in workspace coordinates,
     // Karousel keeps off-screen columns at their real positions
@@ -169,7 +175,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: Qt.rgba(1, 1, 1, row.selected ? 0.08 : 0.03)
+        color: row.foregroundAlpha(row.selected ? 0.08 : 0.03)
         radius: Kirigami.Units.cornerRadius
         opacity: row.overviewRoot.zoom
     }
@@ -204,7 +210,7 @@ Item {
             color: "transparent"
             radius: Kirigami.Units.cornerRadius
             border.width: 2
-            border.color: Qt.rgba(1, 1, 1, row.selected ? 0.5 : 0.2)
+            border.color: row.foregroundAlpha(row.selected ? 0.5 : 0.2)
             opacity: row.overviewRoot.zoom
         }
 
@@ -219,10 +225,10 @@ Item {
                 y: (modelData.y - row.screenGeometry.y) * row.thumbScale - Kirigami.Units.smallSpacing
                 width: modelData.width * row.thumbScale + 2 * Kirigami.Units.smallSpacing
                 height: (modelData.bottom - modelData.y) * row.thumbScale + 2 * Kirigami.Units.smallSpacing
-                color: Qt.rgba(1, 1, 1, 0.05)
+                color: row.foregroundAlpha(0.05)
                 radius: Kirigami.Units.cornerRadius
                 border.width: 1
-                border.color: Qt.rgba(1, 1, 1, 0.3)
+                border.color: row.foregroundAlpha(0.3)
                 opacity: row.overviewRoot.zoom
             }
         }
@@ -245,18 +251,20 @@ Item {
         anchors.centerIn: parent
         visible: row.desktop === null
         text: "+"
-        color: "white"
+        color: row.foreground
         opacity: (row.selected ? 0.8 : 0.4) * row.overviewRoot.zoom
         font.pointSize: Kirigami.Theme.defaultFont.pointSize * 4
     }
 
     Text {
-        anchors.left: parent.left
+        // aligned with the viewport frame
+        x: Math.max(row.padding, viewportFrame.x - flick.contentX)
         anchors.bottom: parent.top
-        anchors.leftMargin: row.padding
         anchors.bottomMargin: Kirigami.Units.smallSpacing
         text: row.desktop !== null ? row.desktop.name : "New desktop"
-        color: "white"
+        font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.3
+        font.bold: row.selected
+        color: row.foreground
         opacity: (row.selected ? 1 : 0.6) * row.overviewRoot.zoom
     }
 
