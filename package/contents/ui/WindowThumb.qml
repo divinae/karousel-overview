@@ -35,7 +35,7 @@ Item {
     Accessible.focused: selected
 
     // follow Karousel's rearranging smoothly, but not while zooming or dragging, when the position has to be exact
-    readonly property bool animateMovement: overviewRoot.zoom === 1 && overviewRoot.draggedWindow === null
+    readonly property bool animateMovement: overviewRoot.zoom === 1 && overviewRoot.draggedWindow === null && !strip.syncingScroll
     Behavior on x {
         enabled: thumb.animateMovement
         NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic }

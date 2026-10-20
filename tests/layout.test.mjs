@@ -7,7 +7,7 @@ import vm from "node:vm";
 const source = readFileSync(new URL("../package/contents/ui/layout.js", import.meta.url), "utf8")
     .replace(/^\.pragma library$/m, "");
 const Layout = {};
-vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, columnScrollSteps, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed });", { exports: Layout });
+vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed });", { exports: Layout });
 
 const rect = (x, y, width, height) => ({ x, y, width, height });
 // objects from the vm context have that context's prototypes, which deepEqual tells apart
@@ -132,12 +132,6 @@ test("stackMoves takes the window out of a shared column first", () => {
 
 test("stackMoves onto its own column does nothing", () => {
     assert.deepEqual(plain(Layout.stackMoves([2, 1], 0, 0)), []);
-});
-
-test("columnScrollSteps scrolls once per threshold and keeps the rest", () => {
-    assert.deepEqual(plain(Layout.columnScrollSteps(0, 50, 100)), { accumulated: 50, steps: 0 });
-    assert.deepEqual(plain(Layout.columnScrollSteps(50, 170, 100)), { accumulated: 20, steps: 2 });
-    assert.deepEqual(plain(Layout.columnScrollSteps(20, -150, 100)), { accumulated: -30, steps: -1 });
 });
 
 test("minimizedSlots lays windows out one after another", () => {

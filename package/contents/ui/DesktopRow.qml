@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
 import "layout.js" as Layout
@@ -17,6 +18,8 @@ Item {
     // the desktop's wallpaper stays in the middle of the row, the windows move past it when panning, like in Niri
     readonly property real viewportWidth: screenGeometry.width * thumbScale
     readonly property real viewportLeft: Math.max(0, (width - viewportWidth) / 2)
+    // rounded once zoomed out, square when it fills the screen at the start of the zoom
+    readonly property real wallpaperRadius: Kirigami.Units.largeSpacing * 1.5 * overviewRoot.zoom
     readonly property QtObject style: overviewRoot.style
 
     // horizontal extent of the strip in workspace coordinates,
@@ -35,7 +38,8 @@ Item {
     property bool editingName: false
     // panning the current desktop's row scrolls Karousel's real view by whole columns, other rows pan their preview
     readonly property bool scrollsKarousel: overviewRoot.karouselAvailable && desktop !== null && desktop === overviewRoot.activeDesktop
-    property real accumulatedPan: 0
+    // Karousel's view is being moved to match the preview, the windows jump to where they already are in the preview
+    property bool syncingScroll: false
     readonly property bool showMinimized: effect.configuration.ShowMinimized && desktop !== null
     // where the minimized windows after the strip end, in the strip's coordinates, 0 when there are none
     property real minimizedEnd: 0
@@ -84,7 +88,7 @@ Item {
         }
         updateMinimized();
         // Karousel scrolling moves the windows, not the view, keep the view where it is
-        if (scrollsKarousel && overviewRoot.draggedWindow === null) {
+        if (scrollsKarousel && overviewRoot.draggedWindow === null && !panning()) {
             centerOnViewport();
         } else if (overviewRoot.selectedWindow !== null) {
             ensureWindowVisible(overviewRoot.selectedWindow);
@@ -241,6 +245,10 @@ Item {
         if (columns.length === 0 || panHandler.active || flick.moving) {
             return;
         }
+        if (scrollsKarousel && overviewRoot.draggedWindow === null) {
+            syncKarouselScroll();
+            return;
+        }
         const target = Layout.snapTarget(columns.map(column => toStripX(column.x)), flick.contentX + viewportLeft, viewportLeft, minContentX(), maxContentX());
         if (target !== null) {
             snapAnimation.to = target;
@@ -256,20 +264,31 @@ Item {
         scrollTo(flick.contentX + delta);
     }
 
-    // pans by delta pixels, positive moves the content to the right
+    // pans the preview smoothly by delta pixels, positive moves the content to the right,
+    // the current desktop's real view follows when the panning stops, see snapToColumn
     function panBy(delta) {
-        if (!scrollsKarousel) {
-            scrollBy(-delta);
-            scheduleSnap();
+        scrollBy(-delta);
+        scheduleSnap();
+    }
+
+    function panning() {
+        return panHandler.active || flick.moving || snapTimer.running;
+    }
+
+    // scrolls Karousel's real view by whole columns, so that the column at the wallpaper's left edge in the preview
+    // is at the screen's left edge, then puts the view back on the wallpaper, where the windows now are
+    function syncKarouselScroll() {
+        const lefts = columns.map(column => toStripX(column.x));
+        const closest = x => lefts.reduce((best, left, i) => Math.abs(left - x) < Math.abs(lefts[best] - x) ? i : best, 0);
+        const steps = closest(viewportFrame.x) - closest(flick.contentX + viewportLeft);
+        if (steps === 0) {
+            snapAnimation.to = Layout.clamp(viewportFrame.x - viewportLeft, minContentX(), maxContentX());
+            snapAnimation.restart();
             return;
         }
-        // a step after half of an average column, in the preview
-        const averageWidth = columns.length > 0 ? columns.reduce((sum, column) => sum + column.width, 0) / columns.length : screenGeometry.width / 2;
-        const pan = Layout.columnScrollSteps(accumulatedPan, delta, averageWidth * thumbScale / 2);
-        accumulatedPan = pan.accumulated;
-        if (pan.steps !== 0) {
-            overviewRoot.scrollKarousel(pan.steps);
-        }
+        syncingScroll = true;
+        syncTimer.restart();
+        overviewRoot.scrollKarousel(steps);
     }
 
     function centerOnViewport() {
@@ -345,6 +364,13 @@ Item {
         easing.type: Easing.OutCubic
     }
 
+    // Karousel moves the windows one by one after scrolling
+    Timer {
+        id: syncTimer
+        interval: Kirigami.Units.longDuration * 2
+        onTriggered: row.syncingScroll = false
+    }
+
     Timer {
         id: boundsTimer
         interval: 0
@@ -364,7 +390,6 @@ Item {
 
         property real startContentX: 0
         property real lastVelocity: 0
-        property real lastTranslation: 0
 
         target: null
         acceptedButtons: Qt.RightButton
@@ -377,10 +402,6 @@ Item {
                 flick.cancelFlick();
                 startContentX = flick.contentX;
                 lastVelocity = 0;
-                lastTranslation = 0;
-                row.accumulatedPan = 0;
-            } else if (row.scrollsKarousel) {
-                row.accumulatedPan = 0;
             } else if (Math.abs(lastVelocity) > 100) {
                 flick.flick(lastVelocity, 0);
             } else {
@@ -388,13 +409,7 @@ Item {
             }
         }
         onTranslationChanged: {
-            if (!active) {
-                return;
-            }
-            if (row.scrollsKarousel) {
-                row.panBy(translation.x - lastTranslation);
-                lastTranslation = translation.x;
-            } else {
+            if (active) {
                 row.scrollTo(startContentX - translation.x);
             }
         }
@@ -445,6 +460,7 @@ Item {
         height: row.height
         // behind the wallpaper, only seen while it loads
         color: Kirigami.Theme.backgroundColor
+        radius: row.wallpaperRadius
         shadow.size: Kirigami.Units.gridUnit * 1.5
         shadow.color: Qt.rgba(0, 0, 0, row.selected ? 0.5 : 0.3)
         opacity: row.overviewRoot.zoom
@@ -458,6 +474,14 @@ Item {
         height: row.height
         clip: true
         visible: row.desktop !== null
+        layer.enabled: row.wallpaperRadius > 0
+        layer.effect: OpacityMask {
+            maskSource: Rectangle {
+                width: row.viewportWidth
+                height: row.height
+                radius: row.wallpaperRadius
+            }
+        }
 
         KWinComponents.DesktopBackground {
             width: row.screenGeometry.width
@@ -476,8 +500,7 @@ Item {
         // not clipped, so that the wallpaper's shadow shows above and below the row
         flickableDirection: Flickable.HorizontalFlick
         boundsBehavior: Flickable.StopAtBounds
-        // the current desktop's row follows Karousel's view instead
-        interactive: row.overviewRoot.draggedWindow === null && !row.scrollsKarousel
+        interactive: row.overviewRoot.draggedWindow === null
         contentWidth: Math.max((row.stripMaxX - row.stripMinX) * row.thumbScale + 2 * row.padding, row.minimizedEnd + row.padding)
         contentHeight: height
         leftMargin: row.viewportLeft

@@ -116,14 +116,6 @@ function stackMoves(columnSizes, source, target) {
     return moves;
 }
 
-// turns dragging the preview by delta pixels (positive is to the right) into whole column scrolls of Karousel's view,
-// one for every threshold pixels; returns what's left of the drag and the scrolls, positive scrolls the view to the left
-function columnScrollSteps(accumulated, delta, threshold) {
-    accumulated += delta;
-    const steps = Math.trunc(accumulated / threshold);
-    return { accumulated: accumulated - steps * threshold, steps: steps };
-}
-
 // positions of minimized windows, laid out one after another from startX; returns their x and where they end
 function minimizedSlots(widths, startX, gap) {
     const xs = [];
