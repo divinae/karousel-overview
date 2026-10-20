@@ -1,9 +1,7 @@
 import QtQuick
-import Qt5Compat.GraphicalEffects
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
-import org.kde.milou as Milou
-import org.kde.plasma.extras as PlasmaExtras
+import "layout.js" as Layout
 
 Item {
     id: overview
@@ -14,11 +12,10 @@ Item {
     readonly property real rowHeight: Math.round(height * effect.configuration.RowHeight / 100)
     readonly property real thumbScale: screenGeometry.height > 0 ? rowHeight / screenGeometry.height : 1
     readonly property bool multipleScreens: KWinComponents.Workspace.screens.length > 1
+    readonly property Item currentRow: rows.currentItem
 
     property QtObject selectedWindow: null
-    property QtObject draggedWindow: null
-    property point dragPosition
-    property point dragOffset
+    readonly property QtObject draggedWindow: dragController.window
     property string searchText: ""
 
     // set once everything is laid out, so that the zoom always animates from 0
@@ -32,6 +29,15 @@ Item {
     // position of the zoomed-into row's viewport frame, in rows' coordinates
     property point zoomOrigin
 
+    readonly property QtObject style: QtObject {
+        // the underlay uses the theme's background color, so draw on top of it with its text color
+        readonly property color foreground: Kirigami.Theme.textColor
+
+        function foregroundAlpha(alpha) {
+            return Qt.rgba(foreground.r, foreground.g, foreground.b, alpha);
+        }
+    }
+
     function currentDesktop() {
         return KWinComponents.Workspace.currentDesktopForScreen(targetScreen);
     }
@@ -39,6 +45,12 @@ Item {
     function rowForDesktop(desktop) {
         const index = KWinComponents.Workspace.desktops.indexOf(desktop);
         return index === -1 ? null : rows.itemAtIndex(index);
+    }
+
+    // the row at a point in the overview's coordinates
+    function rowAt(point) {
+        const position = rows.mapFromItem(overview, point.x, point.y);
+        return rows.itemAt(position.x + rows.contentX, position.y + rows.contentY);
     }
 
     function captureZoomOrigin() {
@@ -62,6 +74,13 @@ Item {
             KWinComponents.Workspace.setCurrentDesktopForScreen(desktop, targetScreen);
         }
         effect.deactivate();
+    }
+
+    function switchToDesktopKeepingOverview(row) {
+        if (row.desktop !== currentDesktop()) {
+            KWinComponents.Workspace.setCurrentDesktopForScreen(row.desktop, targetScreen);
+            rows.currentIndex = row.index;
+        }
     }
 
     function focusWindow(window) {
@@ -90,15 +109,21 @@ Item {
     // reorders columns using Karousel's own key bindings, Karousel doesn't expose any other API
     function moveColumn(window, delta) {
         focusWindow(window);
-        invokeShortcut.arguments = [delta < 0 ? "karousel-column-move-left" : "karousel-column-move-right"];
+        invokeShortcut.arguments = [delta < 0 ? Layout.KarouselShortcuts.columnMoveLeft : Layout.KarouselShortcuts.columnMoveRight];
         for (let i = 0; i < Math.abs(delta); i++) {
             invokeShortcut.call();
         }
         selectedWindow = window;
     }
 
+    // moves to another row without changing focus
+    function showRow(delta) {
+        rows.currentIndex = Layout.clamp(rows.currentIndex + delta, 0, rows.count - 1);
+    }
+
+    // moves to another row and focuses the window closest to the middle of the view
     function selectRow(delta) {
-        const index = Math.max(0, Math.min(rows.count - 1, rows.currentIndex + delta));
+        const index = Layout.clamp(rows.currentIndex + delta, 0, rows.count - 1);
         if (index === rows.currentIndex) {
             return;
         }
@@ -114,34 +139,24 @@ Item {
     }
 
     function startDrag(window, item, scenePosition) {
-        const itemPosition = item.mapToItem(overview, 0, 0);
-        dragPosition = overview.mapFromItem(null, scenePosition.x, scenePosition.y);
-        dragOffset = Qt.point(dragPosition.x - itemPosition.x, dragPosition.y - itemPosition.y);
-        draggedWindow = window;
+        dragController.start(window, item, scenePosition);
     }
 
     function moveDrag(scenePosition) {
-        dragPosition = overview.mapFromItem(null, scenePosition.x, scenePosition.y);
-    }
-
-    function rowAt(point) {
-        const position = rows.mapFromItem(overview, point.x, point.y);
-        return rows.itemAt(position.x + rows.contentX, position.y + rows.contentY);
+        dragController.move(scenePosition);
     }
 
     function endDrag() {
-        const window = draggedWindow;
-        draggedWindow = null;
-        if (window === null) {
-            return;
-        }
-        const row = rowAt(dragPosition);
+        dragController.end();
+    }
+
+    function dropWindow(window, position, centerX) {
+        const row = rowAt(position);
         if (row === null) {
             return;
         }
         if (row.hasWindow(window)) {
-            const dropCenterX = dragPosition.x - dragOffset.x + window.frameGeometry.width * thumbScale / 2;
-            row.reorderColumn(window, dropCenterX);
+            row.reorderColumn(window, centerX);
             return;
         }
         // Karousel picks this up and moves the window to the target desktop's grid
@@ -150,301 +165,7 @@ Item {
         rows.currentIndex = row.index;
     }
 
-    // while dragging a window, pushing it against the left or right edge scrolls the row under it
-    Timer {
-        interval: 16
-        repeat: true
-        running: overview.draggedWindow !== null
-        onTriggered: {
-            const zone = Kirigami.Units.gridUnit * 4;
-            const x = overview.dragPosition.x;
-            let delta = 0;
-            if (x < zone) {
-                delta = -(1 - x / zone);
-            } else if (x > overview.width - zone) {
-                delta = 1 - (overview.width - x) / zone;
-            }
-            if (delta !== 0) {
-                overview.rowAt(overview.dragPosition)?.scrollBy(delta * Kirigami.Units.gridUnit * 1.5);
-            }
-        }
-    }
-
-    // while dragging a window, pushing it against the top or bottom edge moves between rows
-    Timer {
-        interval: 500
-        repeat: true
-        running: overview.draggedWindow !== null
-        onTriggered: {
-            const zone = Kirigami.Units.gridUnit * 3;
-            const y = overview.dragPosition.y;
-            if (y < zone) {
-                rows.currentIndex = Math.max(0, rows.currentIndex - 1);
-            } else if (y > overview.height - zone) {
-                rows.currentIndex = Math.min(rows.count - 1, rows.currentIndex + 1);
-            }
-        }
-    }
-
-    // while dragging a window, holding it over another desktop switches to that desktop
-    property Item dragHoverRow: draggedWindow !== null ? rowAt(dragPosition) : null
-    onDragHoverRowChanged: dragHoverTimer.restart()
-    Timer {
-        id: dragHoverTimer
-        interval: 700
-        onTriggered: {
-            const row = overview.dragHoverRow;
-            if (row === null || row.desktop === null || row.desktop === overview.currentDesktop()) {
-                return;
-            }
-            KWinComponents.Workspace.setCurrentDesktopForScreen(row.desktop, overview.targetScreen);
-            rows.currentIndex = row.index;
-        }
-    }
-
-    KWinComponents.DBusCall {
-        id: invokeShortcut
-        service: "org.kde.kglobalaccel"
-        path: "/component/kwin"
-        method: "invokeShortcut"
-    }
-
-    KWinComponents.DesktopBackground {
-        id: background
-        anchors.fill: parent
-        activity: KWinComponents.Workspace.currentActivity
-        desktop: overview.currentDesktop()
-        outputName: overview.targetScreen.name
-    }
-
-    FastBlur {
-        anchors.fill: parent
-        source: background
-        radius: 64
-        opacity: overview.zoom
-    }
-
-    Rectangle {
-        anchors.fill: parent
-        color: Kirigami.Theme.backgroundColor
-        opacity: 0.7 * overview.zoom
-    }
-
-    ListView {
-        id: rows
-        anchors.fill: parent
-        // one extra row at the end for creating a new desktop
-        model: KWinComponents.Workspace.desktops.length + 1
-        spacing: Kirigami.Units.gridUnit * 2
-        interactive: overview.draggedWindow === null
-        highlightRangeMode: ListView.StrictlyEnforceRange
-        preferredHighlightBegin: (height - overview.rowHeight) / 2
-        preferredHighlightEnd: preferredHighlightBegin + overview.rowHeight
-        highlightMoveDuration: effect.animationDuration
-
-        // zoom from the viewport frame of the current desktop's row filling the screen
-        readonly property real fullScale: 1 / overview.thumbScale
-        transform: [
-            Scale {
-                xScale: rows.fullScale + (1 - rows.fullScale) * overview.zoom
-                yScale: rows.fullScale + (1 - rows.fullScale) * overview.zoom
-            },
-            Translate {
-                x: -rows.fullScale * overview.zoomOrigin.x * (1 - overview.zoom)
-                y: -rows.fullScale * overview.zoomOrigin.y * (1 - overview.zoom)
-            }
-        ]
-
-        // clicking between the rows closes the overview
-        TapHandler {
-            onTapped: eventPoint => {
-                const position = eventPoint.position;
-                if (rows.itemAt(position.x + rows.contentX, position.y + rows.contentY) === null) {
-                    effect.deactivate();
-                }
-            }
-        }
-
-        delegate: DesktopRow {
-            required property int index
-
-            width: rows.width
-            height: overview.rowHeight
-            desktop: index < KWinComponents.Workspace.desktops.length ? KWinComponents.Workspace.desktops[index] : null
-            overviewRoot: overview
-            selected: ListView.isCurrentItem
-        }
-    }
-
-    Loader {
-        active: overview.draggedWindow !== null
-        z: 1
-        x: overview.dragPosition.x - overview.dragOffset.x
-        y: overview.dragPosition.y - overview.dragOffset.y
-        sourceComponent: KWinComponents.WindowThumbnail {
-            wId: overview.draggedWindow.internalId
-            width: overview.draggedWindow.frameGeometry.width * overview.thumbScale
-            height: overview.draggedWindow.frameGeometry.height * overview.thumbScale
-            opacity: 0.8
-        }
-    }
-
-    // vertical scrolling jumps one desktop at a time, horizontal scrolling pans the row under the pointer
-    Item {
-        anchors.fill: parent
-        z: 1
-        enabled: !searchResults.active
-
-        WheelHandler {
-            property real accumulatedY: 0
-
-            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-            onWheel: event => {
-                let deltaX = event.angleDelta.x;
-                let deltaY = event.angleDelta.y;
-                if (event.modifiers & Qt.ShiftModifier) {
-                    deltaX = deltaY;
-                    deltaY = 0;
-                }
-
-                if (deltaX !== 0) {
-                    const position = rows.mapFromItem(overview, point.position.x, point.position.y);
-                    const row = rows.itemAt(position.x + rows.contentX, position.y + rows.contentY) ?? rows.currentItem;
-                    row?.scrollBy(-deltaX);
-                    row?.scheduleSnap();
-                }
-
-                if (Math.sign(deltaY) !== Math.sign(accumulatedY)) {
-                    accumulatedY = 0;
-                }
-                accumulatedY += deltaY;
-                // one mouse wheel notch is 120
-                if (Math.abs(accumulatedY) >= 120) {
-                    overview.selectRow(accumulatedY > 0 ? -1 : 1);
-                    accumulatedY = 0;
-                }
-                event.accepted = true;
-            }
-        }
-    }
-
-    // panels stay where they are and fade out while zooming out
-    Repeater {
-        model: KWinComponents.WindowFilterModel {
-            desktop: overview.currentDesktop()
-            screenName: overview.targetScreen.name
-            windowType: KWinComponents.WindowFilterModel.Dock
-            windowModel: KWinComponents.WindowModel {}
-        }
-
-        KWinComponents.WindowThumbnail {
-            required property QtObject window
-
-            wId: window.internalId
-            x: window.x - overview.screenGeometry.x
-            y: window.y - overview.screenGeometry.y
-            z: 2
-            width: window.width
-            height: window.height
-            opacity: 1 - overview.zoom
-            visible: !window.hidden && opacity > 0
-        }
-    }
-
-    // when no window matches the search, search with KRunner instead
-    Loader {
-        id: searchResults
-        active: overview.searchText !== "" && (rows.currentItem === null || rows.currentItem.windowCount === 0)
-        anchors.fill: parent
-        anchors.topMargin: Kirigami.Units.gridUnit * 4
-        z: 3
-
-        sourceComponent: Rectangle {
-            readonly property alias resultsView: milouView
-
-            color: Qt.rgba(0, 0, 0, 0.5)
-
-            PlasmaExtras.PlaceholderMessage {
-                id: placeholderMessage
-                anchors.top: parent.top
-                anchors.topMargin: Kirigami.Units.largeSpacing
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "No matching windows"
-            }
-
-            Milou.ResultsView {
-                id: milouView
-                anchors.top: placeholderMessage.bottom
-                anchors.bottom: parent.bottom
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.topMargin: Kirigami.Units.largeSpacing
-                width: parent.width / 2
-
-                // only bind queryString after init is done, otherwise the model sets up its own runner manager first
-                property bool initialized: false
-                queryString: initialized ? overview.searchText : ""
-                Component.onCompleted: initialized = true
-
-                onActivated: effect.deactivate()
-            }
-        }
-    }
-
-    Rectangle {
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.top
-        anchors.topMargin: Kirigami.Units.gridUnit
-        z: 4
-        width: searchLabel.implicitWidth + 2 * Kirigami.Units.largeSpacing
-        height: searchLabel.implicitHeight + Kirigami.Units.largeSpacing
-        radius: height / 2
-        color: Qt.rgba(0, 0, 0, 0.7)
-        visible: overview.searchText !== ""
-
-        Text {
-            id: searchLabel
-            anchors.centerIn: parent
-            text: overview.searchText
-            color: "white"
-            font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.5
-        }
-    }
-
-    onSearchTextChanged: Qt.callLater(refreshSelection)
-
-    // the selection follows focus changes from outside the overview, e.g. Karousel's key bindings
-    Connections {
-        target: KWinComponents.Workspace
-        function onWindowActivated(window) {
-            if (window === null || overview.draggedWindow !== null || window.desktops.length !== 1) {
-                return;
-            }
-            const row = overview.rowForDesktop(window.desktops[0]);
-            if (row === null || !row.hasWindow(window)) {
-                return;
-            }
-            overview.selectedWindow = window;
-            rows.currentIndex = row.index;
-            row.ensureWindowVisible(window);
-        }
-    }
-
-    Connections {
-        target: effect
-        function onActivatedChanged() {
-            if (!effect.activated) {
-                overview.captureZoomOrigin();
-            }
-        }
-        function onGestureInProgressChanged() {
-            if (effect.gestureInProgress) {
-                overview.captureZoomOrigin();
-            }
-        }
-    }
-
-    Keys.forwardTo: searchResults.item !== null ? [searchResults.item.resultsView] : []
-    Keys.onPressed: event => {
+    function handleKey(event) {
         switch (event.key) {
         case Qt.Key_Escape:
             if (searchText !== "") {
@@ -490,6 +211,134 @@ Item {
         }
         event.accepted = true;
     }
+
+    KWinComponents.DBusCall {
+        id: invokeShortcut
+        service: "org.kde.kglobalaccel"
+        path: "/component/kwin"
+        method: "invokeShortcut"
+    }
+
+    Backdrop {
+        anchors.fill: parent
+        screen: overview.targetScreen
+        desktop: overview.currentDesktop()
+        zoom: overview.zoom
+    }
+
+    ListView {
+        id: rows
+        anchors.fill: parent
+        // one extra row at the end for creating a new desktop
+        model: KWinComponents.Workspace.desktops.length + 1
+        spacing: Kirigami.Units.gridUnit * 2
+        interactive: overview.draggedWindow === null
+        highlightRangeMode: ListView.StrictlyEnforceRange
+        preferredHighlightBegin: (height - overview.rowHeight) / 2
+        preferredHighlightEnd: preferredHighlightBegin + overview.rowHeight
+        highlightMoveDuration: effect.animationDuration
+
+        // zoom from the viewport frame of the current desktop's row filling the screen
+        readonly property real fullScale: 1 / overview.thumbScale
+        transform: [
+            Scale {
+                xScale: Layout.zoomScale(rows.fullScale, overview.zoom)
+                yScale: Layout.zoomScale(rows.fullScale, overview.zoom)
+            },
+            Translate {
+                x: Layout.zoomOffset(rows.fullScale, overview.zoomOrigin.x, overview.zoom)
+                y: Layout.zoomOffset(rows.fullScale, overview.zoomOrigin.y, overview.zoom)
+            }
+        ]
+
+        // clicking between the rows closes the overview
+        TapHandler {
+            onTapped: eventPoint => {
+                const position = eventPoint.position;
+                if (rows.itemAt(position.x + rows.contentX, position.y + rows.contentY) === null) {
+                    effect.deactivate();
+                }
+            }
+        }
+
+        delegate: DesktopRow {
+            required property int index
+
+            width: rows.width
+            height: overview.rowHeight
+            desktop: index < KWinComponents.Workspace.desktops.length ? KWinComponents.Workspace.desktops[index] : null
+            overviewRoot: overview
+            selected: ListView.isCurrentItem
+        }
+    }
+
+    DragController {
+        id: dragController
+        anchors.fill: parent
+        z: 1
+        overviewRoot: overview
+        onDropped: (window, position, centerX) => overview.dropWindow(window, position, centerX)
+    }
+
+    WheelNavigation {
+        anchors.fill: parent
+        z: 1
+        enabled: searchOverlay.resultsView === null
+        overviewRoot: overview
+    }
+
+    PanelsLayer {
+        anchors.fill: parent
+        z: 2
+        screen: overview.targetScreen
+        desktop: overview.currentDesktop()
+        zoom: overview.zoom
+    }
+
+    SearchOverlay {
+        id: searchOverlay
+        anchors.fill: parent
+        z: 3
+        searchText: overview.searchText
+        showResults: rows.currentItem === null || rows.currentItem.windowCount === 0
+        onResultActivated: effect.deactivate()
+    }
+
+    onSearchTextChanged: Qt.callLater(refreshSelection)
+
+    // the selection follows focus changes from outside the overview, e.g. Karousel's key bindings
+    Connections {
+        target: KWinComponents.Workspace
+        function onWindowActivated(window) {
+            if (window === null || overview.draggedWindow !== null || window.desktops.length !== 1) {
+                return;
+            }
+            const row = overview.rowForDesktop(window.desktops[0]);
+            if (row === null || !row.hasWindow(window)) {
+                return;
+            }
+            overview.selectedWindow = window;
+            rows.currentIndex = row.index;
+            row.ensureWindowVisible(window);
+        }
+    }
+
+    Connections {
+        target: effect
+        function onActivatedChanged() {
+            if (!effect.activated) {
+                overview.captureZoomOrigin();
+            }
+        }
+        function onGestureInProgressChanged() {
+            if (effect.gestureInProgress) {
+                overview.captureZoomOrigin();
+            }
+        }
+    }
+
+    Keys.forwardTo: searchOverlay.resultsView !== null ? [searchOverlay.resultsView] : []
+    Keys.onPressed: event => handleKey(event)
 
     Component.onCompleted: {
         selectedWindow = KWinComponents.Workspace.activeWindow;

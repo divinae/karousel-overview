@@ -1,0 +1,103 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import vm from "node:vm";
+
+// layout.js is a QML JavaScript library, load it without the .pragma line
+const source = readFileSync(new URL("../package/contents/ui/layout.js", import.meta.url), "utf8")
+    .replace(/^\.pragma library$/m, "");
+const Layout = {};
+vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed });", { exports: Layout });
+
+const rect = (x, y, width, height) => ({ x, y, width, height });
+// objects from the vm context have that context's prototypes, which deepEqual tells apart
+const plain = value => JSON.parse(JSON.stringify(value));
+
+test("stripBounds covers the screen when there are no windows", () => {
+    assert.deepEqual(plain(Layout.stripBounds(rect(0, 0, 1920, 1080), [])), { minX: 0, maxX: 1920 });
+});
+
+test("stripBounds includes off-screen columns", () => {
+    const bounds = Layout.stripBounds(rect(0, 0, 1920, 1080), [rect(-800, 0, 700, 1000), rect(1500, 0, 900, 1000)]);
+    assert.deepEqual(plain(bounds), { minX: -800, maxX: 2400 });
+});
+
+test("computeColumns groups windows sharing x and width, sorted from left to right", () => {
+    const columns = Layout.computeColumns([
+        { window: "c", geometry: rect(1000, 0, 500, 1000) },
+        { window: "a1", geometry: rect(0, 0, 800, 490) },
+        { window: "a2", geometry: rect(0.4, 510, 800, 490) },
+        { window: "b", geometry: rect(810, 0, 180, 1000) },
+    ]);
+    assert.deepEqual(plain(columns.map(column => column.windows)), [["a1", "a2"], ["b"], ["c"]]);
+    assert.equal(columns[0].y, 0);
+    assert.equal(columns[0].bottom, 1000);
+});
+
+test("computeColumns of an empty row is empty", () => {
+    assert.deepEqual(plain(Layout.computeColumns([])), []);
+});
+
+test("reorderTarget counts the other columns left of the drop point", () => {
+    const centers = [100, 300, 500, 700];
+    assert.equal(Layout.reorderTarget(centers, 0, 600), 2);
+    assert.equal(Layout.reorderTarget(centers, 3, 200), 1);
+    assert.equal(Layout.reorderTarget(centers, 1, 0), 0);
+    assert.equal(Layout.reorderTarget(centers, 1, 1000), 3);
+    assert.equal(Layout.reorderTarget(centers, 2, 500), 2);
+});
+
+test("snapTarget lines up the closest column with the left edge", () => {
+    assert.equal(Layout.snapTarget([10, 400, 900], 380, 10, 2000), 390);
+    assert.equal(Layout.snapTarget([10, 400, 900], 700, 10, 2000), 890);
+});
+
+test("snapTarget stays within the scroll range", () => {
+    assert.equal(Layout.snapTarget([10, 400, 900], 900, 10, 500), 500);
+    assert.equal(Layout.snapTarget([5], 0, 10, 500), 0);
+});
+
+test("snapTarget without columns has nothing to snap to", () => {
+    assert.equal(Layout.snapTarget([], 100, 10, 500), null);
+});
+
+test("zoom starts with the viewport frame filling the screen and ends at the overview", () => {
+    const fullScale = 2;
+    const origin = 300;
+    // at zoom 0, the frame's corner lands on the screen's corner
+    assert.equal(Layout.zoomScale(fullScale, 0) * origin + Layout.zoomOffset(fullScale, origin, 0), 0);
+    assert.equal(Layout.zoomScale(fullScale, 1), 1);
+    assert.equal(Layout.zoomOffset(fullScale, origin, 1), -0);
+});
+
+test("wheelStep moves one desktop per notch", () => {
+    assert.deepEqual(plain(Layout.wheelStep(0, -120)), { accumulated: 0, step: 1 });
+    assert.deepEqual(plain(Layout.wheelStep(0, 120)), { accumulated: 0, step: -1 });
+});
+
+test("wheelStep accumulates small touchpad deltas", () => {
+    let state = { accumulated: 0, step: 0 };
+    const steps = [];
+    for (let i = 0; i < 10; i++) {
+        state = Layout.wheelStep(state.accumulated, -30);
+        steps.push(state.step);
+    }
+    assert.deepEqual(steps, [0, 0, 0, 1, 0, 0, 0, 1, 0, 0]);
+});
+
+test("wheelStep restarts when the direction changes", () => {
+    assert.deepEqual(plain(Layout.wheelStep(100, -30)), { accumulated: -30, step: 0 });
+});
+
+test("edgeScrollSpeed is fastest at the edges and zero in the middle", () => {
+    assert.equal(Layout.edgeScrollSpeed(0, 1000, 100), -1);
+    assert.equal(Layout.edgeScrollSpeed(50, 1000, 100), -0.5);
+    assert.equal(Layout.edgeScrollSpeed(500, 1000, 100), 0);
+    assert.equal(Layout.edgeScrollSpeed(950, 1000, 100), 0.5);
+    assert.equal(Layout.edgeScrollSpeed(1010, 1000, 100), 1);
+});
+
+test("Karousel shortcut names match Karousel's key bindings", () => {
+    assert.equal(Layout.KarouselShortcuts.columnMoveLeft, "karousel-column-move-left");
+    assert.equal(Layout.KarouselShortcuts.columnMoveRight, "karousel-column-move-right");
+});

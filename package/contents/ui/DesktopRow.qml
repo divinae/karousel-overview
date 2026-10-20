@@ -1,6 +1,7 @@
 import QtQuick
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
+import "layout.js" as Layout
 
 Item {
     id: row
@@ -13,12 +14,7 @@ Item {
     readonly property rect screenGeometry: overviewRoot.screenGeometry
     readonly property real thumbScale: overviewRoot.thumbScale
     readonly property real padding: Kirigami.Units.gridUnit
-    // the overview's underlay uses the theme's background color, so draw on top of it with its text color
-    readonly property color foreground: Kirigami.Theme.textColor
-
-    function foregroundAlpha(alpha) {
-        return Qt.rgba(foreground.r, foreground.g, foreground.b, alpha);
-    }
+    readonly property QtObject style: overviewRoot.style
 
     // horizontal extent of the strip in workspace coordinates,
     // Karousel keeps off-screen columns at their real positions
@@ -33,28 +29,11 @@ Item {
     }
 
     function updateBounds() {
-        let minX = screenGeometry.x;
-        let maxX = screenGeometry.x + screenGeometry.width;
-        const columnMap = new Map();
-        for (const thumb of thumbItems()) {
-            const geometry = thumb.window.frameGeometry;
-            minX = Math.min(minX, geometry.x);
-            maxX = Math.max(maxX, geometry.x + geometry.width);
-
-            // windows in the same Karousel column share x and width
-            const key = Math.round(geometry.x) + ":" + Math.round(geometry.width);
-            const column = columnMap.get(key);
-            if (column === undefined) {
-                columnMap.set(key, { x: geometry.x, y: geometry.y, width: geometry.width, bottom: geometry.y + geometry.height, windows: [thumb.window] });
-            } else {
-                column.y = Math.min(column.y, geometry.y);
-                column.bottom = Math.max(column.bottom, geometry.y + geometry.height);
-                column.windows.push(thumb.window);
-            }
-        }
-        stripMinX = minX;
-        stripMaxX = maxX;
-        columns = Array.from(columnMap.values()).sort((a, b) => a.x - b.x);
+        const entries = thumbItems().map(thumb => ({ window: thumb.window, geometry: thumb.window.frameGeometry }));
+        const bounds = Layout.stripBounds(screenGeometry, entries.map(entry => entry.geometry));
+        stripMinX = bounds.minX;
+        stripMaxX = bounds.maxX;
+        columns = Layout.computeColumns(entries);
     }
 
     function thumbItems() {
@@ -87,12 +66,7 @@ Item {
             return;
         }
         const dropX = flick.contentItem.mapFromItem(overviewRoot, overviewX, 0).x;
-        let target = 0;
-        columns.forEach((column, i) => {
-            if (i !== source && toStripX(column.x + column.width / 2) < dropX) {
-                target++;
-            }
-        });
+        const target = Layout.reorderTarget(columns.map(column => toStripX(column.x + column.width / 2)), source, dropX);
         if (target !== source) {
             overviewRoot.moveColumn(window, target - source);
         }
@@ -107,7 +81,7 @@ Item {
         if (flick.contentWidth <= flick.width) {
             flick.contentX = -flick.leftMargin;
         } else {
-            flick.contentX = Math.max(0, Math.min(contentX, maxContentX()));
+            flick.contentX = Layout.clamp(contentX, 0, maxContentX());
         }
     }
 
@@ -116,16 +90,11 @@ Item {
         if (flick.contentWidth <= flick.width || columns.length === 0 || panHandler.active || flick.moving) {
             return;
         }
-        const left = flick.contentX + padding;
-        let closest = null;
-        for (const column of columns) {
-            const x = toStripX(column.x);
-            if (closest === null || Math.abs(x - left) < Math.abs(closest - left)) {
-                closest = x;
-            }
+        const target = Layout.snapTarget(columns.map(column => toStripX(column.x)), flick.contentX + padding, padding, maxContentX());
+        if (target !== null) {
+            snapAnimation.to = target;
+            snapAnimation.restart();
         }
-        snapAnimation.to = Math.max(0, Math.min(closest - padding, maxContentX()));
-        snapAnimation.restart();
     }
 
     function scheduleSnap() {
@@ -263,7 +232,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: row.foregroundAlpha(row.selected ? 0.08 : 0.03)
+        color: row.style.foregroundAlpha(row.selected ? 0.08 : 0.03)
         radius: Kirigami.Units.cornerRadius
         opacity: row.overviewRoot.zoom
     }
@@ -301,7 +270,7 @@ Item {
             color: "transparent"
             radius: Kirigami.Units.cornerRadius
             border.width: 2
-            border.color: row.foregroundAlpha(row.selected ? 0.5 : 0.2)
+            border.color: row.style.foregroundAlpha(row.selected ? 0.5 : 0.2)
             opacity: row.overviewRoot.zoom
         }
 
@@ -316,10 +285,10 @@ Item {
                 y: (modelData.y - row.screenGeometry.y) * row.thumbScale - Kirigami.Units.smallSpacing
                 width: modelData.width * row.thumbScale + 2 * Kirigami.Units.smallSpacing
                 height: (modelData.bottom - modelData.y) * row.thumbScale + 2 * Kirigami.Units.smallSpacing
-                color: row.foregroundAlpha(0.05)
+                color: row.style.foregroundAlpha(0.05)
                 radius: Kirigami.Units.cornerRadius
                 border.width: 1
-                border.color: row.foregroundAlpha(0.3)
+                border.color: row.style.foregroundAlpha(0.3)
                 opacity: row.overviewRoot.zoom
             }
         }
@@ -342,7 +311,7 @@ Item {
         anchors.centerIn: parent
         visible: row.desktop === null
         text: "+"
-        color: row.foreground
+        color: row.style.foreground
         opacity: (row.selected ? 0.8 : 0.4) * row.overviewRoot.zoom
         font.pointSize: Kirigami.Theme.defaultFont.pointSize * 4
     }
@@ -355,7 +324,7 @@ Item {
         text: row.desktop !== null ? row.desktop.name : "New desktop"
         font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.3
         font.bold: row.selected
-        color: row.foreground
+        color: row.style.foreground
         opacity: (row.selected ? 1 : 0.6) * row.overviewRoot.zoom
     }
 

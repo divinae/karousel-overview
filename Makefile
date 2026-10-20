@@ -6,13 +6,16 @@ QMLLINT ?= /usr/lib/qt6/bin/qmllint
 lint:
 	$(QMLLINT) ./package/contents/ui/*.qml
 
-install: lint
+test:
+	node --test tests/
+
+install: lint test
 	kpackagetool6 --type=KWin/Effect --install=./package || kpackagetool6 --type=KWin/Effect --upgrade=./package
 
 uninstall:
 	kpackagetool6 --type=KWin/Effect --remove=karousel_overview
 
-package: lint
+package: lint test
 	tar -czf ./karousel_overview_${subst .,_,${VERSION}}.tar.gz ./package --transform s/package/karousel_overview/
 
 # headless KWin with its own D-Bus session and config, for testing without restarting the real KWin
