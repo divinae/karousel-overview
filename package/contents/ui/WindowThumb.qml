@@ -18,9 +18,13 @@ Item {
     // grows with the zoom so that the zoom animation starts with windows at their real positions
     readonly property real inset: overviewRoot.zoom * Math.min(effect.configuration.WindowGap / 2, geometry.width * strip.thumbScale / 4, geometry.height * strip.thumbScale / 4)
 
-    x: strip.toStripX(geometry.x) + inset
+    // where the thumbnail goes, x and width follow it with an animation
+    readonly property real layoutX: strip.toStripX(geometry.x) + inset
+    readonly property real layoutWidth: geometry.width * strip.thumbScale - 2 * inset
+
+    x: layoutX
     y: (geometry.y - strip.screenGeometry.y) * strip.thumbScale + inset
-    width: geometry.width * strip.thumbScale - 2 * inset
+    width: layoutWidth
     height: geometry.height * strip.thumbScale - 2 * inset
     z: window.stackingOrder
     visible: window.normalWindow && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen)
@@ -49,13 +53,14 @@ Item {
         NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic }
     }
 
-    onGeometryChanged: {
-        strip.updateBounds();
-        if (selected) {
-            strip.ensureVisible(thumb);
+    onGeometryChanged: strip.scheduleUpdateBounds()
+    onVisibleChanged: strip.scheduleUpdateBounds()
+    // the drag would never end without the DragHandler that tracks it
+    Component.onDestruction: {
+        if (overviewRoot.draggedWindow === window) {
+            overviewRoot.cancelDrag();
         }
     }
-    onVisibleChanged: strip.updateBounds()
 
     KWinComponents.WindowThumbnail {
         anchors.fill: parent
@@ -134,6 +139,8 @@ Item {
         }
 
         TapHandler {
+            // takes the click for itself, so that the thumbnail's own handler doesn't activate the window too
+            gesturePolicy: TapHandler.WithinBounds
             onTapped: thumb.window.closeWindow()
         }
     }
@@ -142,12 +149,15 @@ Item {
         id: hover
     }
 
+    // both take the click for themselves, so that the row behind doesn't switch desktops too
     TapHandler {
+        gesturePolicy: TapHandler.ReleaseWithinBounds
         onTapped: thumb.overviewRoot.activateWindow(thumb.window)
     }
 
     TapHandler {
         acceptedButtons: Qt.MiddleButton
+        gesturePolicy: TapHandler.ReleaseWithinBounds
         onTapped: thumb.window.closeWindow()
     }
 

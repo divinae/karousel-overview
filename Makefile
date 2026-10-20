@@ -1,7 +1,7 @@
 VERSION = $(shell grep '"Version":' ./package/metadata.json | grep -o '[0-9\.]*')
 QMLLINT ?= /usr/lib/qt6/bin/qmllint
 
-.PHONY: *
+.PHONY: lint test install uninstall package nested
 
 lint:
 	$(QMLLINT) ./package/contents/ui/*.qml

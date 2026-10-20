@@ -59,17 +59,41 @@ Item {
         return (x - stripMinX) * thumbScale + padding;
     }
 
+    // windows move one by one when Karousel rearranges, so update once for all of them
+    function scheduleUpdateBounds() {
+        boundsTimer.restart();
+    }
+
     function updateBounds() {
         const entries = thumbItems().map(thumb => ({ window: thumb.window, geometry: thumb.window.frameGeometry }));
         const bounds = Layout.stripBounds(screenGeometry, entries.map(entry => entry.geometry));
         stripMinX = bounds.minX;
         stripMaxX = bounds.maxX;
-        columns = Layout.computeColumns(entries);
+        const newColumns = Layout.computeColumns(entries);
+        // reassigning rebuilds the column frames, only do it when they changed
+        const signature = column => [column.x, column.y, column.width, column.bottom, column.windows.length].join(":");
+        if (newColumns.map(signature).join("|") !== columns.map(signature).join("|")) {
+            columns = newColumns;
+        }
         updateMinimized();
         // Karousel scrolling moves the windows, not the view, keep the view where it is
         if (scrollsKarousel && overviewRoot.draggedWindow === null) {
             centerOnViewport();
+        } else if (overviewRoot.selectedWindow !== null) {
+            ensureWindowVisible(overviewRoot.selectedWindow);
         }
+    }
+
+    // Karousel's columns on this desktop, from all of its windows, also those hidden by the search,
+    // so that the indexes match Karousel's when driving it through its key bindings
+    function karouselColumns() {
+        const activity = KWinComponents.Workspace.currentActivity;
+        const entries = KWinComponents.Workspace.windows
+            .filter(window => window.normalWindow && !window.minimized
+                && window.desktops.length === 1 && window.desktops[0] === desktop
+                && (window.activities.length === 0 || window.activities.includes(activity)))
+            .map(window => ({ window: window, geometry: window.frameGeometry }));
+        return Layout.computeColumns(entries);
     }
 
     // lays out minimized windows one after another after the strip
@@ -102,18 +126,23 @@ Item {
         return items;
     }
 
-    function thumbForWindow(window) {
-        return thumbItems().find(thumb => thumb.window === window) ?? null;
-    }
-
-    function thumbAt(point) {
-        for (const thumb of thumbItems()) {
-            const position = thumb.mapFromItem(overviewRoot, point.x, point.y);
-            if (thumb.contains(position)) {
-                return thumb;
+    // the visible thumbnails in no particular order, cheaper than thumbItems() when the order doesn't matter
+    function forEachThumb(f) {
+        for (let i = 0; i < thumbs.count; i++) {
+            const item = thumbs.itemAt(i);
+            if (item !== null && item.visible && f(item)) {
+                return item;
             }
         }
         return null;
+    }
+
+    function thumbForWindow(window) {
+        return forEachThumb(thumb => thumb.window === window);
+    }
+
+    function thumbAt(point) {
+        return forEachThumb(thumb => thumb.contains(thumb.mapFromItem(overviewRoot, point.x, point.y)));
     }
 
     function hasWindow(window) {
@@ -124,15 +153,17 @@ Item {
         return viewportFrame.mapToItem(item, 0, 0);
     }
 
-    // where the column of a window dropped at overviewX goes, or null if the window isn't in this row
+    // where the column of a window dropped at overviewX goes, among Karousel's columns,
+    // or null if the window isn't in this row
     function columnDrop(window, overviewX) {
-        const source = columns.findIndex(column => column.windows.includes(window));
+        const allColumns = karouselColumns();
+        const source = allColumns.findIndex(column => column.windows.includes(window));
         if (source === -1) {
             return null;
         }
         const dropX = flick.contentItem.mapFromItem(overviewRoot, overviewX, 0).x;
-        const target = Layout.reorderTarget(columns.map(column => toStripX(column.x + column.width / 2)), source, dropX);
-        return { source: source, target: target };
+        const target = Layout.reorderTarget(allColumns.map(column => toStripX(column.x + column.width / 2)), source, dropX);
+        return { columns: allColumns, source: source, target: target };
     }
 
     function reorderColumn(window, overviewX) {
@@ -149,7 +180,7 @@ Item {
             hideInsertHint();
             return;
         }
-        const otherColumns = columns.filter((column, i) => i !== drop.source)
+        const otherColumns = drop.columns.filter((column, i) => i !== drop.source)
             .map(column => ({ left: toStripX(column.x), right: toStripX(column.x + column.width) }));
         insertHintX = Layout.insertHintX(otherColumns, drop.target) ?? NaN;
     }
@@ -218,11 +249,14 @@ Item {
         }
     }
 
+    // uses where the thumbnail goes, not where its animation currently is
     function ensureVisible(item) {
-        if (item.x - padding < flick.contentX) {
-            scrollTo(item.x - padding);
-        } else if (item.x + item.width + padding > flick.contentX + flick.width) {
-            scrollTo(item.x + item.width + padding - flick.width);
+        const x = item.layoutX ?? item.x;
+        const width = item.layoutWidth ?? item.width;
+        if (x - padding < flick.contentX) {
+            scrollTo(x - padding);
+        } else if (x + width + padding > flick.contentX + flick.width) {
+            scrollTo(x + width + padding - flick.width);
         }
     }
 
@@ -274,6 +308,12 @@ Item {
         property: "contentX"
         duration: Kirigami.Units.longDuration
         easing.type: Easing.OutCubic
+    }
+
+    Timer {
+        id: boundsTimer
+        interval: 0
+        onTriggered: row.updateBounds()
     }
 
     // waits for a series of scroll events to end
@@ -455,8 +495,8 @@ Item {
                 overviewRoot: row.overviewRoot
             }
 
-            onItemAdded: row.updateBounds()
-            onItemRemoved: row.updateBounds()
+            onItemAdded: row.scheduleUpdateBounds()
+            onItemRemoved: row.scheduleUpdateBounds()
         }
 
         // minimized windows, smaller and dimmed after the strip, click one to restore it
@@ -500,6 +540,7 @@ Item {
                 }
 
                 TapHandler {
+                    gesturePolicy: TapHandler.ReleaseWithinBounds
                     onTapped: {
                         minimizedThumb.window.minimized = false;
                         row.overviewRoot.focusWindow(minimizedThumb.window);
@@ -535,6 +576,11 @@ Item {
             id: headerHover
         }
 
+        // the header is outside the row, between rows, where a click would close the overview
+        TapHandler {
+            gesturePolicy: TapHandler.WithinBounds
+        }
+
         Row {
             id: header
             spacing: Kirigami.Units.smallSpacing
@@ -548,8 +594,10 @@ Item {
                 color: row.style.foreground
                 opacity: row.selected ? 1 : 0.6
 
+                // takes the clicks for itself, so that clicking the name doesn't close the overview
                 TapHandler {
                     enabled: row.desktop !== null
+                    gesturePolicy: TapHandler.WithinBounds
                     onDoubleTapped: row.startRenaming()
                 }
             }
@@ -591,6 +639,7 @@ Item {
                 }
 
                 TapHandler {
+                    gesturePolicy: TapHandler.WithinBounds
                     onTapped: KWinComponents.Workspace.removeDesktop(row.desktop)
                 }
             }

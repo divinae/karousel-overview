@@ -82,10 +82,12 @@ KWinComponents.SceneEffect {
         }
     }
 
+    // also reopens while closing, the zoom then turns around from where it is
     function activate() {
-        if (activated || deactivateTimer.running) {
+        if (activated) {
             return;
         }
+        deactivateTimer.stop();
         visible = true;
         activated = true;
     }
@@ -99,9 +101,7 @@ KWinComponents.SceneEffect {
     }
 
     function partialActivate(factor) {
-        if (deactivateTimer.running) {
-            return;
-        }
+        deactivateTimer.stop();
         visible = true;
         gestureInProgress = true;
         partialActivationFactor = factor;

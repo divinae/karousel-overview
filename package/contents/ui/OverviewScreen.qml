@@ -64,11 +64,16 @@ Item {
         return rowAt(point)?.thumbAt(point) ?? null;
     }
 
+    // where the current desktop's viewport frame ends up once its row is centered, the rows may still be moving there
     function captureZoomOrigin() {
-        const row = rowForDesktop(currentDesktop());
-        if (row !== null) {
-            zoomOrigin = row.viewportFramePosition(rows);
+        const index = KWinComponents.Workspace.desktops.indexOf(currentDesktop());
+        const row = index === -1 ? null : rows.itemAtIndex(index);
+        if (row === null) {
+            return;
         }
+        rows.currentIndex = index;
+        const frame = row.viewportFramePosition(row);
+        zoomOrigin = Qt.point(frame.x, rows.preferredHighlightBegin + frame.y);
     }
 
     // where a new desktop would be inserted for a point in the gap between two rows, or -1
@@ -145,7 +150,7 @@ Item {
 
     // moves a window into the column of another window on the same desktop
     function stackWindow(window, targetWindow, row) {
-        const columns = row.columns;
+        const columns = row.karouselColumns();
         const source = columns.findIndex(column => column.windows.includes(window));
         const target = columns.findIndex(column => column.windows.includes(targetWindow));
         if (source === -1 || target === -1) {
@@ -193,6 +198,10 @@ Item {
 
     function endDrag() {
         dragController.end();
+    }
+
+    function cancelDrag() {
+        dragController.cancel();
     }
 
     function dropWindow(window, position, centerX, targetWindow) {
@@ -297,7 +306,7 @@ Item {
     Backdrop {
         anchors.fill: parent
         screen: overview.targetScreen
-        desktop: overview.currentDesktop()
+        desktop: overview.activeDesktop
         zoom: overview.zoom
     }
 
@@ -312,6 +321,9 @@ Item {
         preferredHighlightBegin: (height - overview.rowHeight) / 2
         preferredHighlightEnd: preferredHighlightBegin + overview.rowHeight
         highlightMoveDuration: effect.animationDuration
+        // keep all rows around, so that a dragged window's row isn't destroyed when scrolled away and every desktop's row
+        // can be found, there are only a few desktops
+        cacheBuffer: (overview.rowHeight + spacing) * count
 
         // zoom from the viewport frame of the current desktop's row filling the screen
         readonly property real fullScale: 1 / overview.thumbScale
@@ -383,7 +395,7 @@ Item {
         anchors.fill: parent
         z: 2
         screen: overview.targetScreen
-        desktop: overview.currentDesktop()
+        desktop: overview.activeDesktop
         zoom: overview.zoom
     }
 
@@ -401,6 +413,11 @@ Item {
     // the selection follows focus changes from outside the overview, e.g. Karousel's key bindings
     Connections {
         target: KWinComponents.Workspace
+        function onWindowRemoved(window) {
+            if (window === overview.draggedWindow) {
+                overview.cancelDrag();
+            }
+        }
         function onCurrentDesktopChanged() {
             overview.activeDesktop = overview.currentDesktop();
             const index = KWinComponents.Workspace.desktops.indexOf(overview.activeDesktop);

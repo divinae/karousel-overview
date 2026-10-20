@@ -13,17 +13,12 @@ Item {
     // pointer position and its offset from the dragged thumbnail's corner, in the controller's coordinates
     property point position
     property point offset
-    readonly property Item hoveredRow: window !== null ? overviewRoot.rowAt(position) : null
+    // what's under the dragged window, updated by refresh() since the rows also move under a still pointer
+    property Item hoveredRow: null
     // another window under the pointer, whose column the dragged window would join
-    readonly property QtObject targetWindow: {
-        if (window === null) {
-            return null;
-        }
-        const thumb = overviewRoot.thumbAt(position);
-        return thumb !== null && thumb.window !== window ? thumb.window : null;
-    }
+    property QtObject targetWindow: null
     // where dropping creates a new desktop when between two rows, -1 otherwise
-    readonly property int hoveredGap: window !== null ? overviewRoot.gapAt(position) : -1
+    property int hoveredGap: -1
     // center of the dragged thumbnail, where it gets dropped
     readonly property real centerX: window !== null ? position.x - offset.x + window.frameGeometry.width * overviewRoot.thumbScale / 2 : 0
     property Item insertHintRow: null
@@ -35,21 +30,51 @@ Item {
         position = controller.mapFromItem(null, scenePosition.x, scenePosition.y);
         offset = Qt.point(position.x - itemPosition.x, position.y - itemPosition.y);
         controller.window = window;
+        refresh();
     }
 
     function move(scenePosition) {
         position = controller.mapFromItem(null, scenePosition.x, scenePosition.y);
+        refresh();
     }
 
     function end() {
-        const window = controller.window;
+        if (window === null) {
+            return;
+        }
+        refresh();
+        const droppedWindow = window;
         const centerX = controller.centerX;
         const targetWindow = controller.targetWindow;
-        setInsertHintRow(null);
-        controller.window = null;
+        reset();
+        dropped(droppedWindow, position, centerX, targetWindow);
+    }
+
+    // ends the drag without dropping, e.g. when the dragged window or its thumbnail goes away
+    function cancel() {
         if (window !== null) {
-            dropped(window, position, centerX, targetWindow);
+            reset();
         }
+    }
+
+    function reset() {
+        setInsertHintRow(null);
+        window = null;
+        hoveredRow = null;
+        targetWindow = null;
+        hoveredGap = -1;
+    }
+
+    // finds what's under the dragged window
+    function refresh() {
+        if (window === null) {
+            return;
+        }
+        hoveredRow = overviewRoot.rowAt(position);
+        const thumb = overviewRoot.thumbAt(position);
+        targetWindow = thumb !== null && thumb.window !== window ? thumb.window : null;
+        hoveredGap = overviewRoot.gapAt(position);
+        updateInsertHint();
     }
 
     function setInsertHintRow(row) {
@@ -71,12 +96,7 @@ Item {
         row.showInsertHint(window, centerX);
     }
 
-    onCenterXChanged: updateInsertHint()
-    onTargetWindowChanged: updateInsertHint()
-    onHoveredRowChanged: {
-        updateInsertHint();
-        hoverTimer.restart();
-    }
+    onHoveredRowChanged: hoverTimer.restart()
 
     // pushing it against the left or right edge scrolls the row under it
     Timer {
@@ -88,6 +108,8 @@ Item {
             if (speed !== 0) {
                 controller.hoveredRow?.panBy(-speed * Kirigami.Units.gridUnit * 1.5);
             }
+            // the content moves under the pointer while scrolling, also when rows change or Karousel rearranges
+            controller.refresh();
         }
     }
 
