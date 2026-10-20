@@ -2,7 +2,9 @@
 A [Niri](https://github.com/YaLTeR/niri)-style overview effect for KWin, made for the [Karousel](https://github.com/peterfajdiga/karousel) scrollable tiling script.
 
 It shows all virtual desktops stacked vertically, each one as a zoomed-out horizontal strip of its windows, including the columns scrolled off-screen.
-The effect doesn't talk to Karousel directly: Karousel keeps off-screen columns at their real positions, so the strips are rebuilt from window geometry. It works without Karousel too, it just shows windows where they are.
+It needs Karousel: it drives Karousel through its key bindings, and Karousel keeps off-screen columns at their real positions, so the strips are rebuilt from window geometry.
+
+![Karousel Overview with three desktops](docs/screenshot.png)
 
 ## Usage
 - Toggle with Meta+Ctrl+O, a screen edge (System Settings → Screen Edges) or a touchpad swipe up (enable in the effect's settings)
@@ -28,9 +30,10 @@ The gaps between windows are the same as Karousel's, in pixels, although the win
 The height of the desktop rows, centering the clicked window, the "New desktop" row, app icons, window titles, minimized windows and the touchpad gesture can be changed in the effect's settings.
 
 ## Installation
-Requires Plasma 6.
+Requires Plasma 6 and [Karousel](https://github.com/peterfajdiga/karousel).
 
-Clone the repo and run `make install`, then enable "Karousel Overview" in System Settings → Desktop Effects.
+Install it from the [KDE Store](https://www.opendesktop.org/p/2379855/), in System Settings → Desktop Effects → Get New…, or clone the repo and run `make install`.
+Then enable "Karousel Overview" in System Settings → Desktop Effects.
 After updating, restart KWin (or log out and back in) to load the new version.
 
 ## Limitations
