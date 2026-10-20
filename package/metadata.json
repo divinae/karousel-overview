@@ -2,19 +2,17 @@
     "KPackageStructure": "KWin/Effect",
     "KPlugin": {
         "Name": "Karousel Overview",
-        "Description": "Zoomed-out view of Karousel's scrollable desktops; activated with a keyboard shortcut",
+        "Description": "Niri-style overview of scrollable desktops, made for Karousel; activated with a keyboard shortcut or a screen edge",
         "Icon": "preferences-system-windows",
         "Authors": [{
-            "Email": "peter.fajdiga@gmail.com",
-            "Name": "Peter Fajdiga"
+            "Email": "lipinski.j@pm.me",
+            "Name": "Jakub Lipinski"
         }],
         "Category": "Window Management",
         "EnabledByDefault": false,
         "Id": "karousel_overview",
-        "Version": "0.17",
-        "License": "GPLv3",
-        "Website": "https://github.com/peterfajdiga/karousel",
-        "BugReportUrl": "https://github.com/peterfajdiga/karousel/issues"
+        "Version": "0.1",
+        "License": "GPLv3"
     },
     "X-Plasma-API": "declarativescript",
     "X-Plasma-API-Minimum-Version": "6.0",
