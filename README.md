@@ -12,7 +12,7 @@ The effect doesn't talk to Karousel directly: Karousel keeps off-screen columns 
 - Middle-click a window or use its close button to close it
 - Type to filter windows by name; if nothing matches, KRunner results are shown
 - Scroll vertically to jump between desktops, scroll horizontally (or Shift+scroll) to pan a desktop's strip
-- Arrow keys select a window, Enter focuses it, Delete closes it, Escape clears the search or closes the overview
+- Arrow keys move focus between windows and desktops (Karousel scrolls along), Enter closes the overview on the focused window, Delete closes it, Escape clears the search or closes the overview
 
 The height of the desktop rows, the gap between windows and the touchpad gesture can be changed in the effect's settings.
 

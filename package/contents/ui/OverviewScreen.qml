@@ -103,13 +103,13 @@ Item {
             return;
         }
         rows.currentIndex = index;
-        rows.currentItem.selectClosestToViewport();
+        rows.currentItem.selectClosestToViewport(true);
     }
 
     function refreshSelection() {
         const row = rows.currentItem;
         if (row !== null && (selectedWindow === null || !row.hasWindow(selectedWindow))) {
-            row.selectClosestToViewport();
+            row.selectClosestToViewport(false);
         }
     }
 
@@ -354,6 +354,23 @@ Item {
     }
 
     onSearchTextChanged: Qt.callLater(refreshSelection)
+
+    // the selection follows focus changes from outside the overview, e.g. Karousel's key bindings
+    Connections {
+        target: KWinComponents.Workspace
+        function onWindowActivated(window) {
+            if (window === null || overview.draggedWindow !== null || window.desktops.length !== 1) {
+                return;
+            }
+            const row = overview.rowForDesktop(window.desktops[0]);
+            if (row === null || !row.hasWindow(window)) {
+                return;
+            }
+            overview.selectedWindow = window;
+            rows.currentIndex = row.index;
+            row.ensureWindowVisible(window);
+        }
+    }
 
     Connections {
         target: effect

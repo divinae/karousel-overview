@@ -129,8 +129,19 @@ Item {
         }
     }
 
-    function select(item) {
+    // focusing the window makes Karousel scroll to it, like moving focus in Niri's overview
+    function ensureWindowVisible(window) {
+        const thumb = thumbForWindow(window);
+        if (thumb !== null) {
+            ensureVisible(thumb);
+        }
+    }
+
+    function select(item, focus) {
         overviewRoot.selectedWindow = item.window;
+        if (focus) {
+            overviewRoot.focusWindow(item.window);
+        }
         ensureVisible(item);
     }
 
@@ -141,13 +152,13 @@ Item {
         }
         const index = items.findIndex(thumb => thumb.window === overviewRoot.selectedWindow);
         if (index === -1) {
-            select(items[delta > 0 ? 0 : items.length - 1]);
+            select(items[delta > 0 ? 0 : items.length - 1], true);
         } else {
-            select(items[Math.max(0, Math.min(items.length - 1, index + delta))]);
+            select(items[Math.max(0, Math.min(items.length - 1, index + delta))], true);
         }
     }
 
-    function selectClosestToViewport() {
+    function selectClosestToViewport(focus) {
         const center = flick.contentX + flick.width / 2;
         let closest = null;
         for (const thumb of thumbItems()) {
@@ -156,7 +167,7 @@ Item {
             }
         }
         if (closest !== null) {
-            select(closest);
+            select(closest, focus);
         }
     }
 

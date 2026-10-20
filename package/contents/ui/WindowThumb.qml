@@ -25,7 +25,12 @@ Item {
     visible: window.normalWindow && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen)
     opacity: overviewRoot.draggedWindow === window ? 0.3 : 1
 
-    onGeometryChanged: strip.updateBounds()
+    onGeometryChanged: {
+        strip.updateBounds();
+        if (selected) {
+            strip.ensureVisible(thumb);
+        }
+    }
     onVisibleChanged: strip.updateBounds()
 
     KWinComponents.WindowThumbnail {
