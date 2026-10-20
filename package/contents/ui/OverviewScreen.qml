@@ -32,8 +32,12 @@ Item {
         enabled: !effect.gestureInProgress
         NumberAnimation { duration: effect.animationDuration; easing.type: Easing.OutCubic }
     }
+    // rounded corners of the window thumbnails, square at the start of the zoom, where they are the real windows
+    readonly property real windowRadius: Kirigami.Units.largeSpacing * zoom
     // position of the zoomed-into row's viewport frame, in rows' coordinates
     property point zoomOrigin
+    // when the zoom into the desktop ends, in milliseconds since the epoch
+    property real closingEnd: 0
 
     readonly property QtObject style: QtObject {
         // the underlay uses the theme's background color, so draw on top of it with its text color
@@ -119,8 +123,18 @@ Item {
     }
 
     function activateWindow(window) {
-        focusWindow(window);
+        const row = window.desktops.length === 1 ? rowForDesktop(window.desktops[0]) : null;
+        if (row !== null) {
+            row.focusWindow(window);
+        } else {
+            focusWindow(window);
+        }
         effect.deactivate();
+    }
+
+    // how long until the overview has zoomed back into the desktop, -1 when it isn't closing
+    function closingTimeLeft() {
+        return effect.activated || effect.gestureInProgress ? -1 : Math.max(0, overview.closingEnd - Date.now());
     }
 
     function activateSelected() {
@@ -358,6 +372,7 @@ Item {
             // the row for creating a new desktop has no windows to show, so it's smaller
             height: desktop !== null ? overview.rowHeight : Math.round(overview.rowHeight * 0.35)
             desktop: index < KWinComponents.Workspace.desktops.length ? KWinComponents.Workspace.desktops[index] : null
+            number: index + 1
             overviewRoot: overview
             selected: ListView.isCurrentItem
         }
@@ -447,7 +462,10 @@ Item {
             }
             overview.selectedWindow = window;
             rows.currentIndex = row.index;
-            row.ensureWindowVisible(window);
+            // the row's sync glides to where Karousel scrolled
+            if (!row.syncingScroll) {
+                row.ensureWindowVisible(window);
+            }
         }
     }
 
@@ -455,6 +473,7 @@ Item {
         target: effect
         function onActivatedChanged() {
             if (!effect.activated) {
+                overview.closingEnd = Date.now() + effect.animationDuration;
                 overview.captureZoomOrigin();
             }
         }

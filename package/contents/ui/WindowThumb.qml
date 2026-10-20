@@ -22,21 +22,24 @@ Item {
     // where the thumbnail goes, x and width follow it with an animation
     readonly property real layoutX: strip.toStripX(geometry.x) + inset
     readonly property real layoutWidth: geometry.width * strip.thumbScale - 2 * inset
+    // where the thumbnail stays while Karousel's view is synced to the preview, NaN when it follows the window
+    property real heldX: NaN
 
-    x: layoutX
+    x: strip.syncingScroll && !isNaN(heldX) ? heldX : layoutX
     y: (geometry.y - strip.screenGeometry.y) * strip.thumbScale + inset
     width: layoutWidth
     height: geometry.height * strip.thumbScale - 2 * inset
     z: window.stackingOrder
     visible: window.normalWindow && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen)
-    opacity: overviewRoot.draggedWindow === window ? 0.3 : 1
+    // a window that shows up while the view is synced has no place among the held thumbnails yet
+    opacity: strip.syncingScroll && isNaN(heldX) ? 0 : overviewRoot.draggedWindow === window ? 0.3 : 1
 
     Accessible.role: Accessible.Button
     Accessible.name: window.caption
     Accessible.focused: selected
 
     // follow Karousel's rearranging smoothly, but not while zooming or dragging, when the position has to be exact
-    readonly property bool animateMovement: overviewRoot.zoom === 1 && overviewRoot.draggedWindow === null && !strip.syncingScroll
+    readonly property bool animateMovement: overviewRoot.zoom === 1 && overviewRoot.draggedWindow === null && !strip.holdThumbs
     Behavior on x {
         enabled: thumb.animateMovement
         NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic }
@@ -63,33 +66,46 @@ Item {
         }
     }
 
-    // thumbnails don't get KWin's blur behind translucent windows, so blur the part of the wallpaper behind them,
-    // outside the wallpaper its edge is stretched
-    FastBlur {
+    // the window and the blur behind it, with rounded corners
+    Item {
         anchors.fill: parent
-        visible: effect.configuration.BlurBehindWindows && thumb.strip.desktop !== null
-        radius: 32
-        source: ShaderEffectSource {
-            sourceItem: thumb.strip.wallpaperBackground
-            sourceRect: Qt.rect((thumb.x - thumb.strip.contentX - thumb.strip.viewportLeft) / thumb.strip.thumbScale,
-                                thumb.y / thumb.strip.thumbScale,
-                                thumb.width / thumb.strip.thumbScale,
-                                thumb.height / thumb.strip.thumbScale)
-            textureSize: Qt.size(Math.max(1, thumb.width), Math.max(1, thumb.height))
-            wrapMode: ShaderEffectSource.ClampToEdge
+        layer.enabled: thumb.overviewRoot.windowRadius > 0
+        layer.effect: OpacityMask {
+            maskSource: Rectangle {
+                width: thumb.width
+                height: thumb.height
+                radius: thumb.overviewRoot.windowRadius
+            }
         }
-    }
 
-    KWinComponents.WindowThumbnail {
-        anchors.fill: parent
-        wId: thumb.window.internalId
+        // thumbnails don't get KWin's blur behind translucent windows, so blur the part of the wallpaper behind them,
+        // outside the wallpaper its edge is stretched
+        FastBlur {
+            anchors.fill: parent
+            visible: effect.configuration.BlurBehindWindows && thumb.strip.desktop !== null
+            radius: 32
+            source: ShaderEffectSource {
+                sourceItem: thumb.strip.wallpaperBackground
+                sourceRect: Qt.rect((thumb.x - thumb.strip.contentX - thumb.strip.viewportLeft) / thumb.strip.thumbScale,
+                                    thumb.y / thumb.strip.thumbScale,
+                                    thumb.width / thumb.strip.thumbScale,
+                                    thumb.height / thumb.strip.thumbScale)
+                textureSize: Qt.size(Math.max(1, thumb.width), Math.max(1, thumb.height))
+                wrapMode: ShaderEffectSource.ClampToEdge
+            }
+        }
+
+        KWinComponents.WindowThumbnail {
+            anchors.fill: parent
+            wId: thumb.window.internalId
+        }
     }
 
     Rectangle {
         anchors.fill: parent
         anchors.margins: -3
         color: "transparent"
-        radius: Kirigami.Units.cornerRadius
+        radius: thumb.overviewRoot.windowRadius + 3
         border.width: thumb.dropTarget ? 6 : 3
         border.color: Kirigami.Theme.highlightColor
         visible: thumb.selected || thumb.dropTarget || hover.hovered

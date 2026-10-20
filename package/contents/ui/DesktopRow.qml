@@ -11,6 +11,8 @@ Item {
     required property QtObject desktop
     required property Item overviewRoot
     property bool selected: false
+    // the desktop's number, counted from 1
+    property int number: 0
 
     readonly property rect screenGeometry: overviewRoot.screenGeometry
     readonly property real thumbScale: overviewRoot.thumbScale
@@ -20,6 +22,9 @@ Item {
     readonly property real viewportLeft: Math.max(0, (width - viewportWidth) / 2)
     // the row for creating a new desktop is a small card in the middle, with the proportions of a desktop
     readonly property real newDesktopWidth: viewportWidth * height / Math.max(1, overviewRoot.rowHeight)
+    // the wallpaper card, the desktop's view or the new desktop card
+    readonly property real cardLeft: desktop !== null ? viewportLeft : (width - newDesktopWidth) / 2
+    readonly property real cardWidth: desktop !== null ? viewportWidth : newDesktopWidth
     // rounded once zoomed out, square when it fills the screen at the start of the zoom
     readonly property real wallpaperRadius: Kirigami.Units.largeSpacing * 1.5 * overviewRoot.zoom
     readonly property QtObject style: overviewRoot.style
@@ -40,13 +45,19 @@ Item {
     property bool editingName: false
     // panning the current desktop's row scrolls Karousel's real view by whole columns, other rows pan their preview
     readonly property bool scrollsKarousel: overviewRoot.karouselAvailable && desktop !== null && desktop === overviewRoot.activeDesktop
-    // Karousel's view is being moved to match the preview, the windows jump to where they already are in the preview
+    // Karousel's view is being moved to match the preview, the thumbnails stay where they are until it's done
     property bool syncingScroll: false
+    // the thumbnails don't animate their movement, stays on a bit after the sync so that they don't animate its end
+    property bool holdThumbs: false
     // for the blur behind translucent windows
     readonly property Item wallpaperBackground: wallpaperBackground
     readonly property real contentX: flick.contentX
-    // a window and where it was in the row when the sync started, kept there while Karousel moves the windows
+    // the window whose shift shows how far Karousel moved the windows, null when not syncing
     property var syncAnchor: null
+    // the panning didn't stop while syncing, so the view has to be synced again once it's done
+    property bool resyncAfterSync: false
+    // how long the sync waits for Karousel to move the next window
+    property int syncSettleInterval: 0
     readonly property bool showMinimized: effect.configuration.ShowMinimized && desktop !== null
     // where the minimized windows after the strip end, in the strip's coordinates, 0 when there are none
     property real minimizedEnd: 0
@@ -79,10 +90,16 @@ Item {
 
     // windows move one by one when Karousel rearranges, so update once for all of them
     function scheduleUpdateBounds() {
-        boundsTimer.restart();
+        if (syncingScroll) {
+            // Karousel is still moving the windows
+            syncTimer.interval = syncSettleInterval;
+            syncTimer.restart();
+        } else {
+            boundsTimer.restart();
+        }
     }
 
-    function updateBounds() {
+    function refreshBounds() {
         const entries = thumbItems().map(thumb => ({ window: thumb.window, geometry: thumb.window.frameGeometry }));
         const bounds = Layout.stripBounds(screenGeometry, entries.map(entry => entry.geometry));
         stripMinX = bounds.minX;
@@ -94,17 +111,12 @@ Item {
             columns = newColumns;
         }
         updateMinimized();
+    }
+
+    function updateBounds() {
+        refreshBounds();
         // Karousel scrolling moves the windows, not the view, keep the view where it is
-        if (syncingScroll && syncAnchor !== null) {
-            // keep the windows where they were in the preview, then glide to where Karousel actually put them,
-            // which can be a bit off, e.g. because of the gaps or the ends of the strip
-            const anchor = thumbForWindow(syncAnchor.window);
-            if (anchor !== null) {
-                flick.contentX = anchor.layoutX - syncAnchor.x;
-            }
-            snapAnimation.to = Layout.clamp(viewportFrame.x + viewportFrame.width / 2 - flick.width / 2, minContentX(), maxContentX());
-            snapAnimation.restart();
-        } else if (scrollsKarousel && overviewRoot.draggedWindow === null && !panning()) {
+        if (scrollsKarousel && overviewRoot.draggedWindow === null && !panning()) {
             centerOnViewport();
         } else if (overviewRoot.selectedWindow !== null) {
             ensureWindowVisible(overviewRoot.selectedWindow);
@@ -262,13 +274,16 @@ Item {
             return;
         }
         if (scrollsKarousel && overviewRoot.draggedWindow === null) {
-            syncKarouselScroll();
+            if (syncingScroll) {
+                resyncAfterSync = true;
+            } else {
+                syncKarouselScroll();
+            }
             return;
         }
         const target = Layout.snapTarget(columns.map(column => toStripX(column.x)), flick.contentX + viewportLeft, viewportLeft, minContentX(), maxContentX());
         if (target !== null) {
-            snapAnimation.to = target;
-            snapAnimation.restart();
+            glideTo(target);
         }
     }
 
@@ -298,16 +313,90 @@ Item {
         const closest = x => lefts.reduce((best, left, i) => Math.abs(left - x) < Math.abs(lefts[best] - x) ? i : best, 0);
         const steps = closest(viewportFrame.x) - closest(flick.contentX + viewportLeft);
         if (steps === 0) {
-            snapAnimation.to = Layout.clamp(viewportFrame.x - viewportLeft, minContentX(), maxContentX());
-            snapAnimation.restart();
+            glideToViewport();
             return;
         }
+        // Karousel's shortcuts go through D-Bus and it moves the windows one by one
+        startKarouselSync(Kirigami.Units.longDuration * 2, Kirigami.Units.longDuration * 2);
+        overviewRoot.scrollKarousel(steps);
+    }
+
+    // keeps the thumbnails where they are while Karousel moves the windows, until no window has moved for settleInterval,
+    // or none did for firstInterval, see finishKarouselSync
+    function startKarouselSync(firstInterval, settleInterval) {
+        if (syncingScroll) {
+            // e.g. focusing a window while the view is synced, wait for the slower of the two
+            syncSettleInterval = Math.max(syncSettleInterval, settleInterval);
+            syncTimer.interval = Math.max(syncTimer.interval, firstInterval);
+            syncTimer.restart();
+            return;
+        }
+        syncSettleInterval = settleInterval;
+        syncTimer.interval = firstInterval;
+        syncTimer.restart();
+        snapAnimation.stop();
         const anchor = thumbItems().reduce((best, thumb) => best === null
             || Math.abs(thumb.layoutX - flick.contentX - viewportLeft) < Math.abs(best.layoutX - flick.contentX - viewportLeft) ? thumb : best, null);
-        syncAnchor = anchor === null ? null : { window: anchor.window, x: anchor.layoutX - flick.contentX };
+        syncAnchor = anchor === null ? null : anchor.window;
+        holdThumbs = true;
+        forEachThumb(thumb => { thumb.heldX = thumb.x; });
         syncingScroll = true;
-        syncTimer.restart();
-        overviewRoot.scrollKarousel(steps);
+    }
+
+    // Karousel scrolls its view to the focused window, the preview glides after it instead of jumping,
+    // also while the overview zooms into it
+    function focusWindow(window) {
+        if (scrollsKarousel && overviewRoot.draggedWindow === null && hasWindow(window)) {
+            // Karousel moves the windows right away when the focus changes
+            startKarouselSync(Kirigami.Units.shortDuration, 0);
+        }
+        overviewRoot.focusWindow(window);
+    }
+
+    // Karousel is done moving the windows, they go where they really are, and the view moves by as much in the same frame,
+    // so nothing moves on screen, then it glides to the wallpaper, Karousel's view can be a bit off from the preview,
+    // e.g. because of the gaps or the ends of the strip
+    function finishKarouselSync() {
+        const anchor = syncAnchor !== null ? thumbForWindow(syncAnchor) : null;
+        const heldX = anchor !== null ? anchor.heldX : NaN;
+        syncAnchor = null;
+        syncingScroll = false;
+        refreshBounds();
+        if (!isNaN(heldX)) {
+            flick.contentX = Layout.clamp(flick.contentX + anchor.layoutX - heldX, minContentX(), maxContentX());
+        }
+        forEachThumb(thumb => { thumb.heldX = NaN; });
+        // the thumbnails' bindings have already moved them, only then can they animate again,
+        // unless syncing again already, see below
+        Qt.callLater(() => {
+            if (!row.syncingScroll) {
+                row.holdThumbs = false;
+            }
+        });
+        // when still panning, snapToColumn syncs again once it stops
+        const resync = resyncAfterSync;
+        resyncAfterSync = false;
+        if (!panning()) {
+            if (resync) {
+                snapToColumn();
+            } else {
+                glideToViewport();
+            }
+        }
+    }
+
+    function glideToViewport() {
+        // when closing, done by the time the overview has zoomed into the view
+        const closingTimeLeft = overviewRoot.closingTimeLeft();
+        glideTo(Layout.clamp(viewportFrame.x - viewportLeft, minContentX(), maxContentX()),
+                closingTimeLeft >= 0 ? closingTimeLeft : Kirigami.Units.longDuration);
+    }
+
+    function glideTo(contentX, duration = Kirigami.Units.longDuration) {
+        snapAnimation.stop();
+        snapAnimation.duration = duration;
+        snapAnimation.to = contentX;
+        snapAnimation.start();
     }
 
     function centerOnViewport() {
@@ -344,9 +433,12 @@ Item {
     function select(item, focus) {
         overviewRoot.selectedWindow = item.window;
         if (focus) {
-            overviewRoot.focusWindow(item.window);
+            focusWindow(item.window);
         }
-        ensureVisible(item);
+        // focusing it started a sync, which glides to where Karousel scrolled
+        if (!focus || !syncingScroll) {
+            ensureVisible(item);
+        }
     }
 
     function selectNeighbour(delta) {
@@ -379,18 +471,13 @@ Item {
         id: snapAnimation
         target: flick
         property: "contentX"
-        duration: Kirigami.Units.longDuration
         easing.type: Easing.OutCubic
     }
 
-    // Karousel moves the windows one by one after scrolling
+    // Karousel moves the windows one by one after scrolling, the sync is done once they stop moving
     Timer {
         id: syncTimer
-        interval: Kirigami.Units.longDuration * 2
-        onTriggered: {
-            row.syncingScroll = false;
-            row.syncAnchor = null;
-        }
+        onTriggered: row.finishKarouselSync()
     }
 
     Timer {
@@ -466,9 +553,9 @@ Item {
     }
 
     Rectangle {
-        x: row.desktop !== null ? 0 : (row.width - width) / 2
-        width: row.desktop !== null ? row.width : row.newDesktopWidth
+        width: row.width
         height: row.height
+        visible: row.desktop !== null
         color: row.moveHint ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.25)
                             : row.style.foregroundAlpha(row.selected ? 0.08 : 0.03)
         border.width: row.moveHint ? 3 : 0
@@ -479,29 +566,28 @@ Item {
 
     // a shadow under the wallpaper instead of a frame around it
     Kirigami.ShadowedRectangle {
-        x: row.viewportLeft
-        width: row.viewportWidth
+        x: row.cardLeft
+        width: row.cardWidth
         height: row.height
         // behind the wallpaper, only seen while it loads
         color: Kirigami.Theme.backgroundColor
         radius: row.wallpaperRadius
-        shadow.size: Kirigami.Units.gridUnit * 1.5
+        shadow.size: Kirigami.Units.gridUnit * (row.desktop !== null ? 1.5 : 0.75)
         shadow.color: Qt.rgba(0, 0, 0, row.selected ? 0.5 : 0.3)
         opacity: row.overviewRoot.zoom
-        visible: row.desktop !== null
     }
 
-    // the desktop's own wallpaper behind the part of the strip that is visible on screen, like Niri's workspaces
+    // the desktop's own wallpaper behind the part of the strip that is visible on screen, like Niri's workspaces,
+    // the new desktop card shows the current desktop's, like an empty desktop
     Item {
-        x: row.viewportLeft
-        width: row.viewportWidth
+        x: row.cardLeft
+        width: row.cardWidth
         height: row.height
         clip: true
-        visible: row.desktop !== null
         layer.enabled: row.wallpaperRadius > 0
         layer.effect: OpacityMask {
             maskSource: Rectangle {
-                width: row.viewportWidth
+                width: row.cardWidth
                 height: row.height
                 radius: row.wallpaperRadius
             }
@@ -511,12 +597,25 @@ Item {
             id: wallpaperBackground
             width: row.screenGeometry.width
             height: row.screenGeometry.height
-            scale: row.thumbScale
+            scale: row.cardWidth / Math.max(1, row.screenGeometry.width)
             transformOrigin: Item.TopLeft
             activity: KWinComponents.Workspace.currentActivity
-            desktop: row.desktop
+            desktop: row.desktop ?? KWinComponents.Workspace.currentDesktop
             outputName: row.overviewRoot.targetScreen.name
         }
+    }
+
+    // dims the new desktop card, it isn't a desktop yet, highlights it when a dragged window would go to a new desktop
+    Rectangle {
+        x: row.cardLeft
+        width: row.cardWidth
+        height: row.height
+        visible: row.desktop === null
+        color: row.moveHint ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.25)
+                            : Qt.rgba(0, 0, 0, row.selected ? 0.2 : 0.4)
+        border.width: row.moveHint ? 3 : 0
+        border.color: Kirigami.Theme.highlightColor
+        radius: row.wallpaperRadius
     }
 
     Flickable {
@@ -662,6 +761,14 @@ Item {
                 KWinComponents.WindowThumbnail {
                     anchors.fill: parent
                     wId: minimizedThumb.window.internalId
+                    layer.enabled: row.overviewRoot.windowRadius > 0
+                    layer.effect: OpacityMask {
+                        maskSource: Rectangle {
+                            width: minimizedThumb.width
+                            height: minimizedThumb.height
+                            radius: row.overviewRoot.windowRadius * 0.6
+                        }
+                    }
                 }
 
                 Kirigami.Icon {
@@ -689,61 +796,99 @@ Item {
         }
     }
 
-    Text {
+    // on the wallpaper, so in the wallpaper's colours rather than the overview's
+    Rectangle {
         anchors.centerIn: parent
+        width: Kirigami.Units.iconSizes.large
+        height: width
+        radius: width / 2
+        color: Qt.rgba(0, 0, 0, row.selected ? 0.6 : 0.4)
+        opacity: row.overviewRoot.zoom
         visible: row.desktop === null
-        text: "+"
-        color: row.style.foreground
-        opacity: (row.selected ? 0.8 : 0.4) * row.overviewRoot.zoom
-        font.pointSize: Kirigami.Theme.defaultFont.pointSize * 3
+
+        Kirigami.Icon {
+            anchors.centerIn: parent
+            width: Kirigami.Units.iconSizes.smallMedium
+            height: width
+            source: "list-add"
+            color: "white"
+            isMask: true
+        }
     }
 
-    // the desktop's name, double-click to rename, and a button to remove it when it's empty
-    Item {
-        // aligned with the wallpaper, or the new desktop card
-        x: Math.max(row.padding, row.desktop !== null ? row.viewportLeft : (row.width - row.newDesktopWidth) / 2)
-        anchors.bottom: parent.top
-        anchors.bottomMargin: Kirigami.Units.smallSpacing
-        width: header.implicitWidth
-        height: header.implicitHeight
+    // a pill on the wallpaper's top-left corner with the desktop's number and name, double-click to rename,
+    // and a button to remove the desktop when it's empty; on the wallpaper, so in the wallpaper's colours
+    Rectangle {
+        id: pill
+
+        // the default name, a word and the number in any language, only repeats the number
+        readonly property bool showName: row.desktop === null || row.editingName || !new RegExp("^\\S+\\s" + row.number + "$").test(row.desktop.name)
+
+        // across the wallpaper's top edge, so that it covers little of the windows
+        x: row.cardLeft + Kirigami.Units.smallSpacing
+        y: -height / 2
+        width: header.implicitWidth + 2 * (showName ? Kirigami.Units.largeSpacing : Kirigami.Units.smallSpacing)
+        height: header.implicitHeight + 2 * Kirigami.Units.smallSpacing
+        radius: height / 2
+        color: Qt.rgba(0, 0, 0, row.selected ? 0.75 : 0.55)
+        border.width: row.selected ? 1 : 0
+        border.color: Kirigami.Theme.highlightColor
         opacity: row.overviewRoot.zoom
 
         HoverHandler {
             id: headerHover
         }
 
-        // the header is outside the row, between rows, where a click would close the overview
+        // takes the clicks for itself, so that clicking the pill doesn't switch desktops or close the overview
         TapHandler {
             gesturePolicy: TapHandler.WithinBounds
+            onDoubleTapped: {
+                if (row.desktop !== null) {
+                    row.startRenaming();
+                }
+            }
         }
 
         Row {
             id: header
+            anchors.centerIn: parent
             spacing: Kirigami.Units.smallSpacing
+
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.max(Kirigami.Units.iconSizes.small, numberLabel.implicitWidth + Kirigami.Units.smallSpacing)
+                height: Kirigami.Units.iconSizes.small
+                radius: height / 2
+                color: row.selected ? Kirigami.Theme.highlightColor : Qt.rgba(1, 1, 1, 0.25)
+
+                Text {
+                    id: numberLabel
+                    anchors.centerIn: parent
+                    text: row.desktop !== null ? row.number : "+"
+                    color: "white"
+                    font.bold: true
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                }
+            }
 
             Text {
                 id: nameLabel
-                visible: !row.editingName
+                anchors.verticalCenter: parent.verticalCenter
+                visible: !row.editingName && pill.showName
                 text: row.desktop !== null ? row.desktop.name : "New desktop"
-                font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.3
-                font.bold: row.selected
-                color: row.style.foreground
-                opacity: row.selected ? 1 : 0.6
-
-                // takes the clicks for itself, so that clicking the name doesn't close the overview
-                TapHandler {
-                    enabled: row.desktop !== null
-                    gesturePolicy: TapHandler.WithinBounds
-                    onDoubleTapped: row.startRenaming()
-                }
+                font: Kirigami.Theme.defaultFont
+                color: "white"
+                opacity: row.selected ? 1 : 0.8
             }
 
             TextInput {
                 id: nameInput
+                anchors.verticalCenter: parent.verticalCenter
                 visible: row.editingName
                 font: nameLabel.font
-                color: row.style.foreground
+                color: "white"
                 selectByMouse: true
+                selectionColor: Kirigami.Theme.highlightColor
                 onAccepted: row.finishRenaming(true)
                 onActiveFocusChanged: {
                     if (!activeFocus) {
@@ -758,7 +903,7 @@ Item {
                 width: Kirigami.Units.iconSizes.small
                 height: width
                 radius: width / 2
-                color: removeHover.hovered ? "#da4453" : row.style.foregroundAlpha(0.2)
+                color: removeHover.hovered ? "#da4453" : Qt.rgba(1, 1, 1, 0.2)
                 // the window count is filtered by the search, so don't offer removing while searching
                 visible: headerHover.hovered && !row.editingName && row.desktop !== null && row.windowCount === 0
                          && row.overviewRoot.searchText === "" && KWinComponents.Workspace.desktops.length > 1
@@ -766,7 +911,7 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: "✕"
-                    color: removeHover.hovered ? "white" : row.style.foreground
+                    color: "white"
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                 }
 

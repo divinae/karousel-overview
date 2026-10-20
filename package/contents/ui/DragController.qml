@@ -1,6 +1,7 @@
 import QtQuick
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
+import Qt5Compat.GraphicalEffects
 import "layout.js" as Layout
 
 // dragging a window: the thumbnail following the pointer, and scrolling and switching desktops on the way
@@ -185,10 +186,19 @@ Item {
         x: controller.position.x - controller.offset.x
         y: controller.position.y - controller.offset.y
         sourceComponent: KWinComponents.WindowThumbnail {
+            id: ghost
             wId: controller.window.internalId
             width: controller.window.frameGeometry.width * controller.overviewRoot.thumbScale
             height: controller.window.frameGeometry.height * controller.overviewRoot.thumbScale
             opacity: 0.8
+            layer.enabled: true
+            layer.effect: OpacityMask {
+                maskSource: Rectangle {
+                    width: ghost.width
+                    height: ghost.height
+                    radius: controller.overviewRoot.windowRadius
+                }
+            }
         }
     }
 }
