@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
 
@@ -59,6 +60,23 @@ Item {
     Component.onDestruction: {
         if (overviewRoot.draggedWindow === window) {
             overviewRoot.cancelDrag();
+        }
+    }
+
+    // thumbnails don't get KWin's blur behind translucent windows, so blur the part of the wallpaper behind them,
+    // outside the wallpaper its edge is stretched
+    FastBlur {
+        anchors.fill: parent
+        visible: effect.configuration.BlurBehindWindows && thumb.strip.desktop !== null
+        radius: 32
+        source: ShaderEffectSource {
+            sourceItem: thumb.strip.wallpaperBackground
+            sourceRect: Qt.rect((thumb.x - thumb.strip.contentX - thumb.strip.viewportLeft) / thumb.strip.thumbScale,
+                                thumb.y / thumb.strip.thumbScale,
+                                thumb.width / thumb.strip.thumbScale,
+                                thumb.height / thumb.strip.thumbScale)
+            textureSize: Qt.size(Math.max(1, thumb.width), Math.max(1, thumb.height))
+            wrapMode: ShaderEffectSource.ClampToEdge
         }
     }
 

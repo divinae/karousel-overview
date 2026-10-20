@@ -13,6 +13,7 @@ The effect doesn't talk to Karousel directly: Karousel keeps off-screen columns 
 - Panning the current desktop scrolls Karousel's real view column by column, so that you land where you scrolled
 - Karousel's own key bindings work in the overview too, and the overview follows what they do
 - Minimized windows are shown dimmed at the end of their desktop, click one to restore it
+- Translucent windows, like Konsole, get the blurred wallpaper behind them, since KWin's blur doesn't apply to window previews
 - Drop a window between two desktops to create a new desktop there
 - Double-click a desktop's name to rename it, hover the name of an empty desktop to remove it
 - Middle-click a window or use its close button to close it

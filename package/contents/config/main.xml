@@ -25,6 +25,10 @@
             <label>Show window titles on windows</label>
             <default>true</default>
         </entry>
+        <entry name="BlurBehindWindows" type="Bool">
+            <label>Blur the wallpaper behind windows, like KWin's blur behind translucent windows</label>
+            <default>true</default>
+        </entry>
         <entry name="ShowMinimized" type="Bool">
             <label>Show minimized windows at the end of their desktop</label>
             <default>true</default>

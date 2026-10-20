@@ -40,6 +40,9 @@ Item {
     readonly property bool scrollsKarousel: overviewRoot.karouselAvailable && desktop !== null && desktop === overviewRoot.activeDesktop
     // Karousel's view is being moved to match the preview, the windows jump to where they already are in the preview
     property bool syncingScroll: false
+    // for the blur behind translucent windows
+    readonly property Item wallpaperBackground: wallpaperBackground
+    readonly property real contentX: flick.contentX
     // a window and where it was in the row when the sync started, kept there while Karousel moves the windows
     property var syncAnchor: null
     readonly property bool showMinimized: effect.configuration.ShowMinimized && desktop !== null
@@ -501,6 +504,7 @@ Item {
         }
 
         KWinComponents.DesktopBackground {
+            id: wallpaperBackground
             width: row.screenGeometry.width
             height: row.screenGeometry.height
             scale: row.thumbScale
