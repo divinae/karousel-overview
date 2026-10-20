@@ -7,7 +7,7 @@ import vm from "node:vm";
 const source = readFileSync(new URL("../package/contents/ui/layout.js", import.meta.url), "utf8")
     .replace(/^\.pragma library$/m, "");
 const Layout = {};
-vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed });", { exports: Layout });
+vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
 
 const rect = (x, y, width, height) => ({ x, y, width, height });
 // objects from the vm context have that context's prototypes, which deepEqual tells apart
@@ -146,4 +146,23 @@ test("Karousel shortcut names match Karousel's key bindings", () => {
     assert.equal(Layout.KarouselShortcuts.windowMoveRight, "karousel-window-move-right");
     assert.equal(Layout.KarouselShortcuts.scrollLeftColumn, "karousel-grid-scroll-left-column");
     assert.equal(Layout.KarouselShortcuts.scrollRightColumn, "karousel-grid-scroll-right-column");
+    assert.equal(Layout.KarouselShortcuts.scrollFocused, "karousel-grid-scroll-focused");
+});
+
+test("emptyDesktops leaves out desktops with windows and kept ones", () => {
+    assert.deepEqual(plain(Layout.emptyDesktops(["a", "b", "c", "d"], [["a"], ["a", "c"]], ["b"])), ["d"]);
+});
+
+test("emptyDesktops never removes every desktop", () => {
+    assert.deepEqual(plain(Layout.emptyDesktops(["a", "b"], [], [])), ["b"]);
+});
+
+test("innerGaps measures the smallest gap between columns and between windows in a column", () => {
+    // two columns 8 px apart, the second one with two windows 4 px apart, and a third column further away
+    const geometries = [rect(0, 0, 100, 500), rect(108, 0, 100, 248), rect(108, 252, 100, 248), rect(300, 0, 100, 500)];
+    assert.deepEqual(plain(Layout.innerGaps(geometries)), { horizontal: 8, vertical: 4 });
+});
+
+test("innerGaps has nothing to measure with a single window", () => {
+    assert.deepEqual(plain(Layout.innerGaps([rect(0, 0, 100, 500)])), { horizontal: null, vertical: null });
 });

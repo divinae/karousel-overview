@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import Qt5Compat.GraphicalEffects
 import org.kde.kirigami as Kirigami
@@ -6,31 +8,36 @@ import org.kde.kwin as KWinComponents
 Item {
     id: thumb
 
-    required property QtObject window
-    required property Item strip
-    required property Item overviewRoot
+    required property var window
+    required property DesktopRow strip
+    required property OverviewScreen overviewRoot
 
-    readonly property rect geometry: window.frameGeometry
+    // Karousel's layout, also on desktops that aren't current, see OverviewScreen's geometryOf
+    readonly property rect geometry: overviewRoot.geometryOf(window)
     readonly property bool selected: overviewRoot.selectedWindow === window
     readonly property bool dropTarget: overviewRoot.dropTargetWindow === window
     readonly property bool showControls: hover.hovered && overviewRoot.draggedWindow === null && overviewRoot.zoom === 1
 
-    // half of the gap between windows, Karousel's own gaps get too small when zoomed out,
+    // on each side, what makes the gaps between the shrunk windows as big as Karousel's are on screen,
     // grows with the zoom so that the zoom animation starts with windows at their real positions
-    readonly property real inset: overviewRoot.zoom * Math.min(effect.configuration.WindowGap / 2, geometry.width * strip.thumbScale / 4, geometry.height * strip.thumbScale / 4)
+    readonly property real insetX: overviewRoot.zoom * Math.min(overviewRoot.horizontalGap * (1 - strip.thumbScale) / 2, geometry.width * strip.thumbScale / 4)
+    readonly property real insetY: overviewRoot.zoom * Math.min(overviewRoot.verticalGap * (1 - strip.thumbScale) / 2, geometry.height * strip.thumbScale / 4)
 
     // where the thumbnail goes, x and width follow it with an animation
-    readonly property real layoutX: strip.toStripX(geometry.x) + inset
-    readonly property real layoutWidth: geometry.width * strip.thumbScale - 2 * inset
-    // where the thumbnail stays while Karousel's view is synced to the preview, NaN when it follows the window
+    readonly property real layoutX: strip.toStripX(geometry.x) + insetX
+    readonly property real layoutWidth: geometry.width * strip.thumbScale - 2 * insetX
+    // where the thumbnail stays, without its inset, while Karousel's view is synced to the preview, NaN when it follows the window
     property real heldX: NaN
 
-    x: strip.syncingScroll && !isNaN(heldX) ? heldX : layoutX
-    y: (geometry.y - strip.screenGeometry.y) * strip.thumbScale + inset
+    // the inset keeps following the zoom, e.g. while it zooms into a clicked window; then it also glides to where the
+    // window really is, for windows that Karousel doesn't move with the others, like ones it doesn't tile
+    x: strip.syncingScroll && !isNaN(heldX) ? heldX + insetX + (layoutX - insetX - heldX) * strip.settleBlend : layoutX
+    y: (geometry.y - strip.screenGeometry.y) * strip.thumbScale + insetY
     width: layoutWidth
-    height: geometry.height * strip.thumbScale - 2 * inset
+    height: geometry.height * strip.thumbScale - 2 * insetY
     z: window.stackingOrder
-    visible: window.normalWindow && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen)
+    // minimized windows are shown after the strip instead, see DesktopRow
+    visible: window.normalWindow && !window.minimized && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen)
     // a window that shows up while the view is synced has no place among the held thumbnails yet
     opacity: strip.syncingScroll && isNaN(heldX) ? 0 : overviewRoot.draggedWindow === window ? 0.3 : 1
 
@@ -66,31 +73,47 @@ Item {
         }
     }
 
+    // how far the window seems to float above its desktop, higher when hovered or selected, like the desktops
+    property real elevation: selected ? 2 : hover.hovered && overviewRoot.draggedWindow === null ? 1.5 : 1
+    Behavior on elevation {
+        NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic }
+    }
+
+    // only the shadow, cast downwards, the windows float higher than their desktop, even the selected one;
+    // real windows have their own, so it fades in with the zoom
+    Kirigami.ShadowedRectangle {
+        anchors.fill: parent
+        color: "transparent"
+        radius: thumb.overviewRoot.windowRadius
+        shadow.size: Kirigami.Units.gridUnit * (1.5 + 0.75 * thumb.elevation)
+        shadow.yOffset: Kirigami.Units.gridUnit * (0.3 + 0.25 * thumb.elevation)
+        shadow.color: Qt.rgba(0, 0, 0, 0.25 + 0.1 * thumb.elevation)
+        opacity: thumb.overviewRoot.zoom
+    }
+
     // the window and the blur behind it, with rounded corners
     Item {
         anchors.fill: parent
         layer.enabled: thumb.overviewRoot.windowRadius > 0
-        layer.effect: OpacityMask {
-            maskSource: Rectangle {
-                width: thumb.width
-                height: thumb.height
-                radius: thumb.overviewRoot.windowRadius
-            }
+        layer.effect: RoundedCorners {
+            radius: thumb.overviewRoot.windowRadius
         }
 
         // thumbnails don't get KWin's blur behind translucent windows, so blur the part of the wallpaper behind them,
         // outside the wallpaper its edge is stretched
         FastBlur {
             anchors.fill: parent
-            visible: effect.configuration.BlurBehindWindows && thumb.strip.desktop !== null
-            radius: 32
+            // the row can go away before its thumbnails, when its desktop is removed
+            visible: thumb.overviewRoot.config.BlurBehindWindows && thumb.strip !== null && thumb.strip.desktop !== null
+            // FastBlur's largest radius, on a texture of half the size, so it's as strong as KWin's blur
+            radius: 64
             source: ShaderEffectSource {
-                sourceItem: thumb.strip.wallpaperBackground
-                sourceRect: Qt.rect((thumb.x - thumb.strip.contentX - thumb.strip.viewportLeft) / thumb.strip.thumbScale,
+                sourceItem: thumb.strip?.wallpaperBackground ?? null
+                sourceRect: thumb.strip === null ? Qt.rect(0, 0, 0, 0) : Qt.rect((thumb.x - thumb.strip.contentX - thumb.strip.cardLeft) / thumb.strip.thumbScale,
                                     thumb.y / thumb.strip.thumbScale,
                                     thumb.width / thumb.strip.thumbScale,
                                     thumb.height / thumb.strip.thumbScale)
-                textureSize: Qt.size(Math.max(1, thumb.width), Math.max(1, thumb.height))
+                textureSize: Qt.size(Math.max(1, thumb.width / 2), Math.max(1, thumb.height / 2))
                 wrapMode: ShaderEffectSource.ClampToEdge
             }
         }
@@ -108,14 +131,17 @@ Item {
         radius: thumb.overviewRoot.windowRadius + 3
         border.width: thumb.dropTarget ? 6 : 3
         border.color: Kirigami.Theme.highlightColor
-        visible: thumb.selected || thumb.dropTarget || hover.hovered
+        // while dragging, only the window the dragged one would join is highlighted, not every one passed over
+        visible: thumb.selected || thumb.dropTarget || (hover.hovered && thumb.overviewRoot.draggedWindow === null)
         opacity: (thumb.selected || thumb.dropTarget ? 1 : 0.5) * thumb.overviewRoot.zoom
     }
 
     // app icon and window title, each can be turned off in the settings, the title also shows on hover
     Rectangle {
-        readonly property bool showIcon: effect.configuration.ShowIcons
-        readonly property bool showTitle: effect.configuration.ShowTitles || thumb.showControls
+        id: label
+
+        readonly property bool showIcon: thumb.overviewRoot.config.ShowIcons
+        readonly property bool showTitle: thumb.overviewRoot.config.ShowTitles || thumb.showControls
         readonly property real maxWidth: thumb.width - 2 * Kirigami.Units.smallSpacing
 
         anchors.horizontalCenter: parent.horizontalCenter
@@ -138,16 +164,16 @@ Item {
                 width: Kirigami.Units.iconSizes.small
                 height: width
                 source: thumb.window.icon
-                visible: parent.parent.showIcon
+                visible: label.showIcon
             }
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(implicitWidth, parent.parent.maxWidth - (parent.parent.showIcon ? Kirigami.Units.iconSizes.small + parent.spacing : 0))
+                width: Math.min(implicitWidth, label.maxWidth - (label.showIcon ? Kirigami.Units.iconSizes.small + parent.spacing : 0))
                 text: thumb.window.caption
                 elide: Text.ElideRight
                 color: "white"
-                visible: parent.parent.showTitle
+                visible: label.showTitle
             }
         }
     }

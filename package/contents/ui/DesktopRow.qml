@@ -1,5 +1,6 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
-import Qt5Compat.GraphicalEffects
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
 import "layout.js" as Layout
@@ -8,8 +9,8 @@ Item {
     id: row
 
     // null for the row that creates a new desktop
-    required property QtObject desktop
-    required property Item overviewRoot
+    required property var desktop
+    required property OverviewScreen overviewRoot
     property bool selected: false
     // the desktop's number, counted from 1
     property int number: 0
@@ -20,14 +21,15 @@ Item {
     // the desktop's wallpaper stays in the middle of the row, the windows move past it when panning, like in Niri
     readonly property real viewportWidth: screenGeometry.width * thumbScale
     readonly property real viewportLeft: Math.max(0, (width - viewportWidth) / 2)
-    // the row for creating a new desktop is a small card in the middle, with the proportions of a desktop
-    readonly property real newDesktopWidth: viewportWidth * height / Math.max(1, overviewRoot.rowHeight)
     // the wallpaper card, the desktop's view or the new desktop card
-    readonly property real cardLeft: desktop !== null ? viewportLeft : (width - newDesktopWidth) / 2
-    readonly property real cardWidth: desktop !== null ? viewportWidth : newDesktopWidth
+    // in the middle once zoomed out, for the current desktop where the zoom goes to or comes from when zoomed in,
+    // so that the wallpaper is where the real one is even when the strip isn't centered; that point stays put during
+    // the zoom, unlike the part of the strip on screen, which jumps when Karousel's view is synced while zooming
+    readonly property real cardLeft: viewportLeft + (selected ? overviewRoot.zoomOrigin.x - viewportLeft : 0) * (1 - overviewRoot.zoom)
+    readonly property real cardWidth: viewportWidth
     // rounded once zoomed out, square when it fills the screen at the start of the zoom
     readonly property real wallpaperRadius: Kirigami.Units.largeSpacing * 1.5 * overviewRoot.zoom
-    readonly property QtObject style: overviewRoot.style
+    readonly property var style: overviewRoot.style
 
     // horizontal extent of the strip in workspace coordinates,
     // Karousel keeps off-screen columns at their real positions
@@ -50,15 +52,29 @@ Item {
     // the thumbnails don't animate their movement, stays on a bit after the sync so that they don't animate its end
     property bool holdThumbs: false
     // for the blur behind translucent windows
-    readonly property Item wallpaperBackground: wallpaperBackground
+    readonly property Item wallpaperBackground: wallpaperItem
     readonly property real contentX: flick.contentX
     // the window whose shift shows how far Karousel moved the windows, null when not syncing
     property var syncAnchor: null
+    // where the anchor window was in the strip when last taken in, see rebaseHeld
+    property real syncAnchorX: NaN
     // the panning didn't stop while syncing, so the view has to be synced again once it's done
     property bool resyncAfterSync: false
     // how long the sync waits for Karousel to move the next window
     property int syncSettleInterval: 0
-    readonly property bool showMinimized: effect.configuration.ShowMinimized && desktop !== null
+    // after clicking a window, the sync lasts until the strip has glided to it, taking in Karousel's moves as they come,
+    // see rebaseHeld
+    property bool syncWhileClosing: false
+    // when Karousel last moved the windows during that sync, see readyToZoom
+    property real lastKarouselMove: 0
+    // how far the held thumbnails have glided to where their windows are while the strip glides to a clicked window,
+    // from 0 to 1, see WindowThumb's x; it's what moves the windows that Karousel doesn't move with the others,
+    // like ones it doesn't tile
+    property real glideFrom: NaN
+    property real glideTarget: NaN
+    readonly property real settleBlend: isNaN(glideFrom) || Math.abs(glideTarget - glideFrom) < 0.5 ? 0
+        : Layout.clamp((flick.contentX - glideFrom) / (glideTarget - glideFrom), 0, 1)
+    readonly property bool showMinimized: overviewRoot.config.ShowMinimized && desktop !== null
     // where the minimized windows after the strip end, in the strip's coordinates, 0 when there are none
     property real minimizedEnd: 0
 
@@ -90,7 +106,9 @@ Item {
 
     // windows move one by one when Karousel rearranges, so update once for all of them
     function scheduleUpdateBounds() {
-        if (syncingScroll) {
+        if (syncingScroll && syncWhileClosing) {
+            rebaseHeld();
+        } else if (syncingScroll) {
             // Karousel is still moving the windows
             syncTimer.interval = syncSettleInterval;
             syncTimer.restart();
@@ -100,7 +118,7 @@ Item {
     }
 
     function refreshBounds() {
-        const entries = thumbItems().map(thumb => ({ window: thumb.window, geometry: thumb.window.frameGeometry }));
+        const entries = thumbItems().map(thumb => ({ window: thumb.window, geometry: thumb.geometry }));
         const bounds = Layout.stripBounds(screenGeometry, entries.map(entry => entry.geometry));
         stripMinX = bounds.minX;
         stripMaxX = bounds.maxX;
@@ -111,6 +129,18 @@ Item {
             columns = newColumns;
         }
         updateMinimized();
+        // from the current desktop, laid out by Karousel right now, also the windows hidden by the search,
+        // which leave bigger gaps
+        if (!scrollsKarousel) {
+            return;
+        }
+        const gaps = Layout.innerGaps(karouselWindows().map(window => window.frameGeometry));
+        if (gaps.horizontal !== null) {
+            overviewRoot.horizontalGap = gaps.horizontal;
+        }
+        if (gaps.vertical !== null) {
+            overviewRoot.verticalGap = gaps.vertical;
+        }
     }
 
     function updateBounds() {
@@ -126,13 +156,16 @@ Item {
     // Karousel's columns on this desktop, from all of its windows, also those hidden by the search,
     // so that the indexes match Karousel's when driving it through its key bindings
     function karouselColumns() {
+        return Layout.computeColumns(karouselWindows().map(window => ({ window: window, geometry: overviewRoot.geometryOf(window) })));
+    }
+
+    function karouselWindows() {
         const activity = KWinComponents.Workspace.currentActivity;
-        const entries = KWinComponents.Workspace.windows
+        return KWinComponents.Workspace.windows
             .filter(window => window.normalWindow && !window.minimized
                 && window.desktops.length === 1 && window.desktops[0] === desktop
-                && (window.activities.length === 0 || window.activities.includes(activity)))
-            .map(window => ({ window: window, geometry: window.frameGeometry }));
-        return Layout.computeColumns(entries);
+                && (window.activities.length === 0 || window.activities.includes(activity))
+                && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen));
     }
 
     // lays out minimized windows one after another after the strip
@@ -161,7 +194,7 @@ Item {
                 items.push(item);
             }
         }
-        items.sort((a, b) => a.window.frameGeometry.x - b.window.frameGeometry.x || a.window.frameGeometry.y - b.window.frameGeometry.y);
+        items.sort((a, b) => a.geometry.x - b.geometry.x || a.geometry.y - b.geometry.y);
         return items;
     }
 
@@ -338,32 +371,91 @@ Item {
         const anchor = thumbItems().reduce((best, thumb) => best === null
             || Math.abs(thumb.layoutX - flick.contentX - viewportLeft) < Math.abs(best.layoutX - flick.contentX - viewportLeft) ? thumb : best, null);
         syncAnchor = anchor === null ? null : anchor.window;
+        syncAnchorX = anchor === null ? NaN : toStripX(anchor.window.frameGeometry.x);
         holdThumbs = true;
-        forEachThumb(thumb => { thumb.heldX = thumb.x; });
+        forEachThumb(thumb => { thumb.heldX = thumb.x - thumb.insetX; });
         syncingScroll = true;
     }
 
     // Karousel scrolls its view to the focused window, the preview glides after it instead of jumping,
     // also while the overview zooms into it
-    function focusWindow(window) {
-        if (scrollsKarousel && overviewRoot.draggedWindow === null && hasWindow(window)) {
-            // Karousel moves the windows right away when the focus changes
-            startKarouselSync(Kirigami.Units.shortDuration, 0);
+    // with center, Karousel then also scrolls it to the middle of the screen
+    // activating it means the overview zooms into it after this, see OverviewScreen's activateWindow
+    function focusWindow(window, activating = false, center = false) {
+        const syncs = scrollsKarousel && overviewRoot.draggedWindow === null && hasWindow(window);
+        if (syncs) {
+            // Karousel moves the windows right away when the focus changes; when activating, also centering, which comes
+            // later through D-Bus, the moves are taken in as they come until the overview zooms in, see rebaseHeld and
+            // readyToZoom
+            startKarouselSync(activating ? 5000 : Kirigami.Units.shortDuration, 0);
+            syncWhileClosing = activating;
+            lastKarouselMove = Date.now();
         }
+        // Karousel's centering toggles, from the middle it scrolls the window back to the side
+        const centered = !center || isCentered(window);
         overviewRoot.focusWindow(window);
+        if (syncs && !centered) {
+            overviewRoot.invokeKarousel([Layout.KarouselShortcuts.scrollFocused]);
+        }
+    }
+
+    // whether the window's column is in the middle of the area Karousel tiles in, give or take its rounding
+    function isCentered(window) {
+        const area = KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, overviewRoot.targetScreen, desktop);
+        const column = karouselColumns().find(column => column.windows.includes(window));
+        return column !== undefined && Math.abs(column.x + column.width / 2 - (area.x + area.width / 2)) <= 1;
     }
 
     // Karousel is done moving the windows, they go where they really are, and the view moves by as much in the same frame,
     // so nothing moves on screen, then it glides to the wallpaper, Karousel's view can be a bit off from the preview,
     // e.g. because of the gaps or the ends of the strip
-    function finishKarouselSync() {
+    // while zooming into a clicked window, Karousel's moves are taken in as they come, so it doesn't matter how late
+    // they are: the held thumbnails and the view move by as much, so nothing moves on screen, and the glide to the
+    // wallpaper starts over for what's left of the zoom
+    function rebaseHeld() {
+        if (syncAnchor === null || isNaN(syncAnchorX)) {
+            return;
+        }
+        // from the window itself, this runs from the change handlers, before the thumbnails' bindings have caught up,
+        // and Karousel can move a window back and forth within one rearrangement
+        const x = toStripX(syncAnchor.frameGeometry.x);
+        const delta = x - syncAnchorX;
+        if (Math.abs(delta) < 0.01) {
+            return;
+        }
+        syncAnchorX = x;
+        lastKarouselMove = Date.now();
+        // from where they are on screen, also those already gliding to their windows, see settleBlend, before the view
+        // moves, which would move the glide along
+        bakeHeld(delta);
+        glideFrom = NaN;
+        flick.contentX += delta;
+        glideToViewport();
+    }
+
+    // the held thumbnails stay where they are on screen, shifted by delta with the view, from here on
+    function bakeHeld(delta = 0) {
+        forEachThumb(thumb => {
+            if (!isNaN(thumb.heldX)) {
+                thumb.heldX = thumb.x - thumb.insetX + delta;
+            }
+        });
+    }
+
+    // after clicking a window, the strip has glided so that the part of it on screen is under the wallpaper, so the
+    // view is put exactly there, where the windows are on the screen, see OverviewScreen's activateWindow
+    function finishKarouselSync(atViewport = false) {
+        syncWhileClosing = false;
+        glideFrom = NaN;
         const anchor = syncAnchor !== null ? thumbForWindow(syncAnchor) : null;
         const heldX = anchor !== null ? anchor.heldX : NaN;
         syncAnchor = null;
         syncingScroll = false;
         refreshBounds();
-        if (!isNaN(heldX)) {
-            flick.contentX = Layout.clamp(flick.contentX + anchor.layoutX - heldX, minContentX(), maxContentX());
+        if (atViewport) {
+            flick.contentX = viewportFrame.x - viewportLeft;
+        } else if (!isNaN(heldX)) {
+            flick.contentX = Layout.clamp(flick.contentX + anchor.layoutX - anchor.insetX - heldX, minContentX(), maxContentX());
         }
         forEachThumb(thumb => { thumb.heldX = NaN; });
         // the thumbnails' bindings have already moved them, only then can they animate again,
@@ -376,7 +468,7 @@ Item {
         // when still panning, snapToColumn syncs again once it stops
         const resync = resyncAfterSync;
         resyncAfterSync = false;
-        if (!panning()) {
+        if (!panning() && !atViewport) {
             if (resync) {
                 snapToColumn();
             } else {
@@ -386,28 +478,35 @@ Item {
     }
 
     function glideToViewport() {
-        // when closing, done by the time the overview has zoomed into the view
-        const closingTimeLeft = overviewRoot.closingTimeLeft();
-        glideTo(Layout.clamp(viewportFrame.x - viewportLeft, minContentX(), maxContentX()),
-                closingTimeLeft >= 0 ? closingTimeLeft : Kirigami.Units.longDuration);
+        if (syncWhileClosing) {
+            // the clicked window on its way to where Karousel put it, starting and ending gently, it can be far;
+            // all the way, the strip's ends aren't up to date while the thumbnails are held, so they don't limit it
+            const target = viewportFrame.x - viewportLeft;
+            bakeHeld();
+            glideFrom = flick.contentX;
+            glideTarget = target;
+            glideTo(target, Kirigami.Units.longDuration * 1.5, Easing.InOutCubic);
+        } else {
+            glideTo(Layout.clamp(viewportFrame.x - viewportLeft, minContentX(), maxContentX()));
+        }
     }
 
-    function glideTo(contentX, duration = Kirigami.Units.longDuration) {
+    // after clicking a window: Karousel is done moving the windows and the strip has glided to them,
+    // the overview can zoom in
+    function readyToZoom() {
+        return !snapAnimation.running && Date.now() - lastKarouselMove > 40;
+    }
+
+    function glideTo(contentX, duration = Kirigami.Units.longDuration, easing = Easing.OutCubic) {
         snapAnimation.stop();
         snapAnimation.duration = duration;
+        snapAnimation.easing.type = easing;
         snapAnimation.to = contentX;
         snapAnimation.start();
     }
 
     function centerOnViewport() {
         scrollTo(viewportFrame.x + viewportFrame.width / 2 - flick.width / 2);
-    }
-
-    function centerOnWindow(window) {
-        const thumb = thumbForWindow(window);
-        if (thumb !== null) {
-            scrollTo(thumb.x + thumb.width / 2 - flick.width / 2);
-        }
     }
 
     // keeps the item within the wallpaper, uses where the thumbnail goes, not where its animation currently is
@@ -534,7 +633,8 @@ Item {
         activity: KWinComponents.Workspace.currentActivity
         desktop: row.desktop
         filter: row.overviewRoot.searchText
-        minimizedWindows: false
+        // with the minimized ones, hidden in the strip, the model doesn't take a window back in when it's restored
+        minimizedWindows: true
         windowType: ~KWinComponents.WindowFilterModel.Dock &
                     ~KWinComponents.WindowFilterModel.Desktop &
                     ~KWinComponents.WindowFilterModel.Notification &
@@ -552,49 +652,66 @@ Item {
         windowModel: KWinComponents.WindowModel {}
     }
 
+    // the whole row lights up when a dragged window would move to this desktop, otherwise there's only the wallpaper
     Rectangle {
         width: row.width
         height: row.height
-        visible: row.desktop !== null
-        color: row.moveHint ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.25)
-                            : row.style.foregroundAlpha(row.selected ? 0.08 : 0.03)
-        border.width: row.moveHint ? 3 : 0
+        visible: row.desktop !== null && row.moveHint
+        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.25)
+        border.width: 3
         border.color: Kirigami.Theme.highlightColor
         radius: Kirigami.Units.cornerRadius
         opacity: row.overviewRoot.zoom
     }
 
-    // a shadow under the wallpaper instead of a frame around it
+    // how far the wallpaper card seems to float above the overview, the selected desktop higher, the new desktop card lower
+    property real elevation: desktop === null ? 0.5 : selected ? 2 : 1
+    Behavior on elevation {
+        NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic }
+    }
+
+    // a shadow under the wallpaper instead of a frame around it, like Material's elevation: a tight ambient shadow
+    // all around, and a soft one cast downwards that grows with the elevation
     Kirigami.ShadowedRectangle {
         x: row.cardLeft
         width: row.cardWidth
         height: row.height
-        // behind the wallpaper, only seen while it loads
-        color: Kirigami.Theme.backgroundColor
+        color: "transparent"
         radius: row.wallpaperRadius
-        shadow.size: Kirigami.Units.gridUnit * (row.desktop !== null ? 1.5 : 0.75)
-        shadow.color: Qt.rgba(0, 0, 0, row.selected ? 0.5 : 0.3)
+        shadow.size: Kirigami.Units.gridUnit * 0.5
+        shadow.color: Qt.rgba(0, 0, 0, 0.2)
+        opacity: row.overviewRoot.zoom
+    }
+
+    Kirigami.ShadowedRectangle {
+        x: row.cardLeft
+        width: row.cardWidth
+        height: row.height
+        // only the shadow, a filling would show at the wallpaper's antialiased edges
+        color: "transparent"
+        radius: row.wallpaperRadius
+        // lower than the windows on it, see WindowThumb
+        shadow.size: Kirigami.Units.gridUnit * (0.5 + 0.75 * row.elevation)
+        shadow.yOffset: Kirigami.Units.gridUnit * 0.25 * row.elevation
+        shadow.color: Qt.rgba(0, 0, 0, 0.12 + 0.1 * row.elevation)
         opacity: row.overviewRoot.zoom
     }
 
     // the desktop's own wallpaper behind the part of the strip that is visible on screen, like Niri's workspaces,
-    // the new desktop card shows the current desktop's, like an empty desktop
+    // the new desktop card shows the current desktop's, see-through, an empty desktop that isn't there yet
     Item {
         x: row.cardLeft
         width: row.cardWidth
         height: row.height
         clip: true
+        opacity: row.desktop !== null ? 1 : (row.selected ? 0.6 : 0.35)
         layer.enabled: row.wallpaperRadius > 0
-        layer.effect: OpacityMask {
-            maskSource: Rectangle {
-                width: row.cardWidth
-                height: row.height
-                radius: row.wallpaperRadius
-            }
+        layer.effect: RoundedCorners {
+            radius: row.wallpaperRadius
         }
 
         KWinComponents.DesktopBackground {
-            id: wallpaperBackground
+            id: wallpaperItem
             width: row.screenGeometry.width
             height: row.screenGeometry.height
             scale: row.cardWidth / Math.max(1, row.screenGeometry.width)
@@ -605,15 +722,14 @@ Item {
         }
     }
 
-    // dims the new desktop card, it isn't a desktop yet, highlights it when a dragged window would go to a new desktop
+    // highlights the new desktop card when a dragged window would go to a new desktop
     Rectangle {
         x: row.cardLeft
         width: row.cardWidth
         height: row.height
-        visible: row.desktop === null
-        color: row.moveHint ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.25)
-                            : Qt.rgba(0, 0, 0, row.selected ? 0.2 : 0.4)
-        border.width: row.moveHint ? 3 : 0
+        visible: row.desktop === null && row.moveHint
+        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.25)
+        border.width: 3
         border.color: Kirigami.Theme.highlightColor
         radius: row.wallpaperRadius
     }
@@ -726,7 +842,8 @@ Item {
             model: row.desktop !== null ? windowFilterModel : null
 
             delegate: WindowThumb {
-                strip: row
+                // the linter doesn't match a component's own type inside its file
+                strip: row // qmllint disable incompatible-type
                 overviewRoot: row.overviewRoot
             }
 
@@ -742,7 +859,7 @@ Item {
             delegate: Item {
                 id: minimizedThumb
 
-                required property QtObject window
+                required property var window
                 property real slotX: 0
 
                 x: slotX
@@ -750,7 +867,7 @@ Item {
                 width: window.frameGeometry.width * row.thumbScale * 0.6
                 height: window.frameGeometry.height * row.thumbScale * 0.6
                 visible: window.minimized && (!row.overviewRoot.multipleScreens || window.output === row.overviewRoot.targetScreen)
-                opacity: (minimizedHover.hovered ? 0.9 : 0.5) * row.overviewRoot.zoom
+                opacity: (minimizedHover.hovered && row.overviewRoot.draggedWindow === null ? 0.9 : 0.5) * row.overviewRoot.zoom
 
                 Accessible.role: Accessible.Button
                 Accessible.name: window.caption
@@ -762,12 +879,8 @@ Item {
                     anchors.fill: parent
                     wId: minimizedThumb.window.internalId
                     layer.enabled: row.overviewRoot.windowRadius > 0
-                    layer.effect: OpacityMask {
-                        maskSource: Rectangle {
-                            width: minimizedThumb.width
-                            height: minimizedThumb.height
-                            radius: row.overviewRoot.windowRadius * 0.6
-                        }
+                    layer.effect: RoundedCorners {
+                        radius: row.overviewRoot.windowRadius * 0.6
                     }
                 }
 

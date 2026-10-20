@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import "layout.js" as Layout
 
@@ -5,7 +7,7 @@ import "layout.js" as Layout
 Item {
     id: navigation
 
-    required property Item overviewRoot
+    required property OverviewScreen overviewRoot
 
     WheelHandler {
         property real accumulatedY: 0

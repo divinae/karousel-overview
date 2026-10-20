@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import Qt5Compat.GraphicalEffects
 import org.kde.kirigami as Kirigami
@@ -7,8 +9,8 @@ import org.kde.kwin as KWinComponents
 Item {
     id: backdrop
 
-    required property QtObject screen
-    required property QtObject desktop
+    required property var screen
+    required property var desktop
     required property real zoom
 
     KWinComponents.DesktopBackground {

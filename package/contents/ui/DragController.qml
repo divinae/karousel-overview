@@ -1,29 +1,30 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
-import Qt5Compat.GraphicalEffects
 import "layout.js" as Layout
 
 // dragging a window: the thumbnail following the pointer, and scrolling and switching desktops on the way
 Item {
     id: controller
 
-    required property Item overviewRoot
+    required property OverviewScreen overviewRoot
 
-    property QtObject window: null
+    property var window: null
     // pointer position and its offset from the dragged thumbnail's corner, in the controller's coordinates
     property point position
     property point offset
     // what's under the dragged window, updated by refresh() since the rows also move under a still pointer
-    property Item hoveredRow: null
+    property DesktopRow hoveredRow: null
     // another window under the pointer, whose column the dragged window would join
-    property QtObject targetWindow: null
+    property var targetWindow: null
     // where dropping creates a new desktop when between two rows, -1 otherwise
     property int hoveredGap: -1
     // what dropping here does, shown next to the dragged window, empty when nothing
     property string dropAction: ""
     // the row showing a hint of what dropping does
-    property Item hintRow: null
+    property DesktopRow hintRow: null
     // center of the dragged thumbnail, where it gets dropped
     readonly property real centerX: window !== null ? position.x - offset.x + window.frameGeometry.width * overviewRoot.thumbScale / 2 : 0
 
@@ -192,12 +193,8 @@ Item {
             height: controller.window.frameGeometry.height * controller.overviewRoot.thumbScale
             opacity: 0.8
             layer.enabled: true
-            layer.effect: OpacityMask {
-                maskSource: Rectangle {
-                    width: ghost.width
-                    height: ghost.height
-                    radius: controller.overviewRoot.windowRadius
-                }
+            layer.effect: RoundedCorners {
+                radius: controller.overviewRoot.windowRadius
             }
         }
     }

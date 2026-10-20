@@ -13,6 +13,8 @@ const KarouselShortcuts = {
     // moves the view by one column, without changing focus
     scrollLeftColumn: "karousel-grid-scroll-left-column",
     scrollRightColumn: "karousel-grid-scroll-right-column",
+    // scrolls so that the focused window is in the middle of the screen
+    scrollFocused: "karousel-grid-scroll-focused",
 };
 
 function repeat(name, count) {
@@ -171,4 +173,41 @@ function edgeScrollSpeed(position, size, zone) {
         return 1 - Math.max(0, size - position) / zone;
     }
     return 0;
+}
+
+
+// the desktops without windows, except the kept ones, and never all of them
+function emptyDesktops(desktops, windowDesktops, kept) {
+    const used = new Set();
+    for (const windowDesktopList of windowDesktops) {
+        for (const desktop of windowDesktopList) {
+            used.add(desktop);
+        }
+    }
+    const empty = desktops.filter(desktop => !used.has(desktop) && !kept.includes(desktop));
+    return empty.length === desktops.length ? empty.slice(1) : empty;
+}
+
+// Karousel's gaps between columns and between the windows in a column, measured from where it put the windows
+// of one desktop, since its settings can't be read from here; null where there's nothing to measure
+function innerGaps(geometries) {
+    const columns = computeColumns(geometries.map(geometry => ({ window: geometry, geometry: geometry })));
+    let horizontal = null;
+    let vertical = null;
+    for (let i = 1; i < columns.length; i++) {
+        const gap = columns[i].x - (columns[i - 1].x + columns[i - 1].width);
+        if (gap >= 0 && (horizontal === null || gap < horizontal)) {
+            horizontal = gap;
+        }
+    }
+    for (const column of columns) {
+        const windows = column.windows.slice().sort((a, b) => a.y - b.y);
+        for (let i = 1; i < windows.length; i++) {
+            const gap = windows[i].y - (windows[i - 1].y + windows[i - 1].height);
+            if (gap >= 0 && (vertical === null || gap < vertical)) {
+                vertical = gap;
+            }
+        }
+    }
+    return { horizontal: horizontal, vertical: vertical };
 }

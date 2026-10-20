@@ -11,19 +11,13 @@
             <min>20</min>
             <max>90</max>
         </entry>
-        <entry name="WindowGap" type="Int">
-            <label>Gap between windows, in pixels</label>
-            <default>6</default>
-            <min>0</min>
-            <max>64</max>
-        </entry>
         <entry name="ShowIcons" type="Bool">
             <label>Show app icons on windows</label>
             <default>true</default>
         </entry>
         <entry name="ShowTitles" type="Bool">
             <label>Show window titles on windows</label>
-            <default>true</default>
+            <default>false</default>
         </entry>
         <entry name="BlurBehindWindows" type="Bool">
             <label>Blur the wallpaper behind windows, like KWin's blur behind translucent windows</label>
@@ -33,12 +27,24 @@
             <label>Show minimized windows at the end of their desktop</label>
             <default>true</default>
         </entry>
+        <entry name="CenterOnClick" type="Bool">
+            <label>Clicking a window centers it on the screen, otherwise Karousel only scrolls as far as needed</label>
+            <default>true</default>
+        </entry>
+        <entry name="ShowNewDesktopRow" type="Bool">
+            <label>Show a "New desktop" row after the last desktop, to create a desktop by clicking it or dropping a window on it</label>
+            <default>true</default>
+        </entry>
+        <entry name="RemoveEmptyDesktops" type="Bool">
+            <label>Remove desktops created in the overview once they have no windows, when the overview closes, except the current one</label>
+            <default>false</default>
+        </entry>
         <entry name="TouchpadGesture" type="Bool">
             <label>Open and close the overview with a vertical touchpad swipe</label>
             <default>false</default>
         </entry>
         <entry name="GestureFingerCount" type="Int">
-            <default>4</default>
+            <default>3</default>
             <min>3</min>
             <max>4</max>
         </entry>

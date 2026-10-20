@@ -1,6 +1,7 @@
 import QtQuick
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
+import "layout.js" as Layout
 
 KWinComponents.SceneEffect {
     id: effect
@@ -9,12 +10,60 @@ KWinComponents.SceneEffect {
     property bool gestureInProgress: false
     property real partialActivationFactor: 0
     readonly property int animationDuration: Kirigami.Units.longDuration
+    // ids of the desktops created in the overview, only these are removed when empty, the user's own desktops stay
+    property var temporaryDesktops: []
+    // where each window was while its desktop was the current one, which is where Karousel lays it out; once its
+    // desktop isn't current any more, KWin pulls the windows that are far off screen back onto it, on top of each other;
+    // by window id, changed in place, nothing binds to it
+    property var layouts: ({})
 
-    delegate: OverviewScreen {}
+    function rememberGeometry(window) {
+        const desktop = window.desktops.length === 1 ? window.desktops[0] : null;
+        if (desktop !== null && desktop === KWinComponents.Workspace.currentDesktopForScreen(window.output)) {
+            const geometry = window.frameGeometry;
+            layouts[window.internalId.toString()] = {
+                geometry: Qt.rect(geometry.x, geometry.y, geometry.width, geometry.height),
+                desktop: desktop.id,
+            };
+        }
+    }
+
+    // null when not known for the desktop the window is on now, e.g. after it was moved to another one
+    function rememberedGeometry(window) {
+        const layout = layouts[window.internalId.toString()];
+        return layout !== undefined && window.desktops.length === 1 && layout.desktop === window.desktops[0].id ? layout.geometry : null;
+    }
+
+    // the effect's id from a delegate, like below
+    // qmllint disable unqualified
+    Instantiator {
+        model: KWinComponents.WindowModel {}
+        delegate: Connections {
+            id: tracker
+            required property var window
+            // the window may be gone when its tracker is destroyed
+            readonly property string windowId: window.internalId.toString()
+            target: tracker.window
+            function onFrameGeometryChanged() {
+                effect.rememberGeometry(tracker.window);
+            }
+            Component.onCompleted: effect.rememberGeometry(tracker.window)
+            Component.onDestruction: delete effect.layouts[tracker.windowId]
+        }
+    }
+    // qmllint enable unqualified
+
+    // KWin creates the delegate outside this file's context, so the components here can't be bound to it
+    // (pragma ComponentBehavior: Bound), and the linter can't tell that the effect's id is reachable from them
+    // qmllint disable unqualified
+    delegate: OverviewScreen {
+        sceneEffect: effect
+    }
 
     Instantiator {
         model: effect.configuration.BorderActivate
         KWinComponents.ScreenEdgeHandler {
+            required property int modelData
             mode: KWinComponents.ScreenEdgeHandler.Pointer
             edge: modelData
             onActivated: effect.toggle()
@@ -24,6 +73,7 @@ KWinComponents.SceneEffect {
     Instantiator {
         model: effect.configuration.TouchBorderActivate
         KWinComponents.ScreenEdgeHandler {
+            required property int modelData
             mode: KWinComponents.ScreenEdgeHandler.Touch
             edge: modelData
             onActivated: effect.toggle()
@@ -68,10 +118,38 @@ KWinComponents.SceneEffect {
         }
     }
 
+    // qmllint enable unqualified
+
     Timer {
         id: deactivateTimer
         interval: effect.animationDuration
         onTriggered: effect.visible = false
+    }
+
+    // called by each screen's overview as it's destroyed after closing, removing desktops while its rows are torn down
+    // crashes KWin, so only after that
+    function overviewDestroyed() {
+        if (!visible && configuration.RemoveEmptyDesktops) {
+            Qt.callLater(removeEmptyDesktops);
+        }
+    }
+
+    // like GNOME's dynamic workspaces, but only for the desktops created in the overview,
+    // keeps the desktops shown on the screens
+    function removeEmptyDesktops() {
+        if (visible) {
+            return;
+        }
+        const workspace = KWinComponents.Workspace;
+        const kept = workspace.screens.map(screen => workspace.currentDesktopForScreen(screen))
+            .concat(workspace.desktops.filter(desktop => !temporaryDesktops.includes(desktop.id)));
+        // windows on all desktops have no desktops of their own
+        const empty = Layout.emptyDesktops(workspace.desktops, Array.from(workspace.windows, window => Array.from(window.desktops)), kept);
+        for (const desktop of empty) {
+            workspace.removeDesktop(desktop);
+        }
+        const ids = workspace.desktops.map(desktop => desktop.id);
+        temporaryDesktops = temporaryDesktops.filter(id => ids.includes(id));
     }
 
     function toggle() {

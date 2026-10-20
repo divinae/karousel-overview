@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
@@ -7,39 +9,45 @@ Item {
     id: overview
     focus: true
 
-    readonly property QtObject targetScreen: KWinComponents.SceneView.screen
+    // main.qml's effect, passed down rather than reached by its id, so that qmllint can follow it
+    required property var sceneEffect
+    readonly property var config: sceneEffect.configuration
+    // KWin's objects are typed var, qmllint doesn't know their types
+    readonly property var targetScreen: KWinComponents.SceneView.screen
     readonly property rect screenGeometry: targetScreen.geometry
-    readonly property real rowHeight: Math.round(height * effect.configuration.RowHeight / 100)
+    readonly property real rowHeight: Math.round(height * overview.config.RowHeight / 100)
     readonly property real thumbScale: screenGeometry.height > 0 ? rowHeight / screenGeometry.height : 1
     readonly property bool multipleScreens: KWinComponents.Workspace.screens.length > 1
-    readonly property Item currentRow: rows.currentItem
+    readonly property DesktopRow currentRow: rows.currentItem as DesktopRow
 
-    property QtObject selectedWindow: null
-    readonly property QtObject draggedWindow: dragController.window
+    // Karousel's gaps between columns and between the windows in a column, in pixels, the overview keeps them
+    // although the windows are smaller, measured by the rows from where Karousel put the windows
+    property real horizontalGap: 0
+    property real verticalGap: horizontalGap
+    property var selectedWindow: null
+    readonly property var draggedWindow: dragController.window
     // the window that a dragged window would join the column of
-    readonly property QtObject dropTargetWindow: dragController.targetWindow
+    readonly property var dropTargetWindow: dragController.targetWindow
     // whether Karousel's key bindings are there to drive it
     property bool karouselAvailable: false
     // the current desktop of this screen, kept up to date
-    property QtObject activeDesktop: currentDesktop()
+    property var activeDesktop: currentDesktop()
     property string searchText: ""
 
     // set once everything is laid out, so that the zoom always animates from 0
     property bool organized: false
     // 0 shows the current desktop at its real size, 1 is fully zoomed out
-    property real zoom: !organized ? 0 : effect.gestureInProgress ? effect.partialActivationFactor : (effect.activated ? 1 : 0)
+    property real zoom: !organized ? 0 : overview.sceneEffect.gestureInProgress ? overview.sceneEffect.partialActivationFactor : (overview.sceneEffect.activated ? 1 : 0)
     Behavior on zoom {
-        enabled: !effect.gestureInProgress
-        NumberAnimation { duration: effect.animationDuration; easing.type: Easing.OutCubic }
+        enabled: !overview.sceneEffect.gestureInProgress
+        NumberAnimation { duration: overview.sceneEffect.animationDuration; easing.type: Easing.OutCubic }
     }
     // rounded corners of the window thumbnails, square at the start of the zoom, where they are the real windows
     readonly property real windowRadius: Kirigami.Units.largeSpacing * zoom
     // position of the zoomed-into row's viewport frame, in rows' coordinates
     property point zoomOrigin
-    // when the zoom into the desktop ends, in milliseconds since the epoch
-    property real closingEnd: 0
 
-    readonly property QtObject style: QtObject {
+    readonly property var style: QtObject {
         // the underlay uses the theme's background color, so draw on top of it with its text color
         readonly property color foreground: Kirigami.Theme.textColor
 
@@ -48,13 +56,25 @@ Item {
         }
     }
 
+    // where a window is in Karousel's layout: on other desktops than the current one where it was while its desktop
+    // was current, KWin has moved the windows far off screen since, see main.qml's layouts
+    function geometryOf(window) {
+        if (window.desktops.length === 1 && window.desktops[0] !== overview.activeDesktop) {
+            const remembered = overview.sceneEffect.rememberedGeometry(window);
+            if (remembered !== null) {
+                return remembered;
+            }
+        }
+        return window.frameGeometry;
+    }
+
     function currentDesktop() {
         return KWinComponents.Workspace.currentDesktopForScreen(targetScreen);
     }
 
     function rowForDesktop(desktop) {
         const index = KWinComponents.Workspace.desktops.indexOf(desktop);
-        return index === -1 ? null : rows.itemAtIndex(index);
+        return index === -1 ? null : rows.itemAtIndex(index) as DesktopRow;
     }
 
     // the row at a point in the overview's coordinates
@@ -71,7 +91,7 @@ Item {
     // where the current desktop's viewport frame ends up once its row is centered, the rows may still be moving there
     function captureZoomOrigin() {
         const index = KWinComponents.Workspace.desktops.indexOf(currentDesktop());
-        const row = index === -1 ? null : rows.itemAtIndex(index);
+        const row = index === -1 ? null : rows.itemAtIndex(index) as DesktopRow;
         if (row === null) {
             return;
         }
@@ -87,15 +107,27 @@ Item {
         }
         const above = rowAt(Qt.point(point.x, point.y - rows.spacing));
         const below = rowAt(Qt.point(point.x, point.y + rows.spacing));
+        // after the last desktop when there's no "New desktop" row there to drop onto
+        if (below === null && above !== null && above.desktop !== null && !overview.config.ShowNewDesktopRow
+                && above.index === KWinComponents.Workspace.desktops.length - 1) {
+            return above.index + 1;
+        }
         if (below === null || below.desktop === null || (above === null && below.index !== 0)) {
             return -1;
         }
         return below.index;
     }
 
+    // desktops created here while the setting is on are temporary, removed again once empty, see removeEmptyDesktops
     function createDesktop(position = KWinComponents.Workspace.desktops.length) {
         KWinComponents.Workspace.createDesktop(position, "");
-        return KWinComponents.Workspace.desktops[position];
+        const desktops = KWinComponents.Workspace.desktops;
+        const desktop = desktops[position];
+        if (overview.config.RemoveEmptyDesktops) {
+            const ids = desktops.map(desktop => desktop.id);
+            overview.sceneEffect.temporaryDesktops = overview.sceneEffect.temporaryDesktops.filter(id => ids.includes(id)).concat([desktop.id]);
+        }
+        return desktop;
     }
 
     function switchToDesktop(desktop) {
@@ -105,7 +137,7 @@ Item {
         if (desktop !== currentDesktop()) {
             KWinComponents.Workspace.setCurrentDesktopForScreen(desktop, targetScreen);
         }
-        effect.deactivate();
+        overview.sceneEffect.deactivate();
     }
 
     function switchToDesktopKeepingOverview(row) {
@@ -122,25 +154,49 @@ Item {
         KWinComponents.Workspace.activeWindow = window;
     }
 
+    // the row that zooms in once its strip has glided to the clicked window, see activateWindow
+    property DesktopRow activationRow: null
+    property real activationStart: 0
+
     function activateWindow(window) {
         const row = window.desktops.length === 1 ? rowForDesktop(window.desktops[0]) : null;
-        if (row !== null) {
-            row.focusWindow(window);
-        } else {
+        if (row === null || !row.scrollsKarousel) {
+            // switching to its desktop first, the zoom goes into that desktop's row
             focusWindow(window);
+            overview.sceneEffect.deactivate();
+            return;
         }
-        effect.deactivate();
+        // like niri's, the strip first glides to the window in the middle of the screen, then the overview zooms
+        // into it; both at once move the strip a long way at the start of the zoom, when the window is far away
+        row.focusWindow(window, true, overview.config.CenterOnClick);
+        activationRow = row;
+        activationStart = Date.now();
+        activationTimer.start();
     }
 
-    // how long until the overview has zoomed back into the desktop, -1 when it isn't closing
-    function closingTimeLeft() {
-        return effect.activated || effect.gestureInProgress ? -1 : Math.max(0, overview.closingEnd - Date.now());
+    Timer {
+        id: activationTimer
+        interval: 16
+        repeat: true
+        onTriggered: {
+            const row = overview.activationRow;
+            if (row !== null && !row.readyToZoom() && Date.now() - overview.activationStart < 1000) {
+                return;
+            }
+            stop();
+            overview.activationRow = null;
+            // the windows are where they really are, so the sync can end, before the zoom starts from the view
+            if (row !== null && row.syncingScroll) {
+                row.finishKarouselSync(true);
+            }
+            overview.sceneEffect.deactivate();
+        }
     }
 
     function activateSelected() {
-        const row = rows.currentItem;
+        const row = overview.currentRow;
         if (row === null) {
-            effect.deactivate();
+            overview.sceneEffect.deactivate();
         } else if (selectedWindow !== null && row.hasWindow(selectedWindow)) {
             activateWindow(selectedWindow);
         } else {
@@ -192,11 +248,11 @@ Item {
             return;
         }
         rows.currentIndex = index;
-        rows.currentItem.selectClosestToViewport(true);
+        overview.currentRow.selectClosestToViewport(true);
     }
 
     function refreshSelection() {
-        const row = rows.currentItem;
+        const row = overview.currentRow;
         if (row !== null && (selectedWindow === null || !row.hasWindow(selectedWindow))) {
             row.selectClosestToViewport(false);
         }
@@ -258,7 +314,7 @@ Item {
             if (searchText !== "") {
                 searchText = "";
             } else {
-                effect.deactivate();
+                overview.sceneEffect.deactivate();
             }
             break;
         case Qt.Key_Up:
@@ -268,10 +324,10 @@ Item {
             selectRow(1);
             break;
         case Qt.Key_Left:
-            rows.currentItem?.selectNeighbour(-1);
+            overview.currentRow?.selectNeighbour(-1);
             break;
         case Qt.Key_Right:
-            rows.currentItem?.selectNeighbour(1);
+            overview.currentRow?.selectNeighbour(1);
             break;
         case Qt.Key_Return:
         case Qt.Key_Enter:
@@ -329,15 +385,43 @@ Item {
         id: rows
         anchors.fill: parent
         // one extra row at the end for creating a new desktop
-        model: KWinComponents.Workspace.desktops.length + 1
+        model: KWinComponents.Workspace.desktops.length + (overview.config.ShowNewDesktopRow ? 1 : 0)
+
+        // the model is a number, so a desktop added or removed resets the view to the first row; the desktop shown
+        // before is shown again, or when it's the one removed, the one before it
+        property var shownDesktop: null
+        property int shownIndex: 0
+        property int knownCount: 0
+        onCurrentIndexChanged: {
+            if (count === knownCount) {
+                shownIndex = currentIndex;
+                shownDesktop = currentIndex < KWinComponents.Workspace.desktops.length ? KWinComponents.Workspace.desktops[currentIndex] : null;
+            }
+        }
+        onCountChanged: {
+            // also emitted again by the reset, with the same count
+            if (count === knownCount) {
+                return;
+            }
+            const removed = count < knownCount;
+            knownCount = count;
+            if (!overview.organized) {
+                return;
+            }
+            const index = rows.shownDesktop !== null ? KWinComponents.Workspace.desktops.indexOf(rows.shownDesktop) : -1;
+            const target = Layout.clamp(index !== -1 ? index : rows.shownIndex - (removed ? 1 : 0), 0, count - 1);
+            // the reset can come after this
+            Qt.callLater(() => {
+                rows.currentIndex = target;
+                rows.positionViewAtIndex(target, ListView.Center);
+            });
+        }
         spacing: Kirigami.Units.gridUnit * 2
         interactive: overview.draggedWindow === null
         highlightRangeMode: ListView.StrictlyEnforceRange
-        // the current row in the middle, the new desktop row is smaller than the others
-        readonly property real currentRowHeight: currentItem !== null ? currentItem.height : overview.rowHeight
-        preferredHighlightBegin: (height - currentRowHeight) / 2
-        preferredHighlightEnd: preferredHighlightBegin + currentRowHeight
-        highlightMoveDuration: effect.animationDuration
+        preferredHighlightBegin: (height - overview.rowHeight) / 2
+        preferredHighlightEnd: preferredHighlightBegin + overview.rowHeight
+        highlightMoveDuration: overview.sceneEffect.animationDuration
         // keep all rows around, so that a dragged window's row isn't destroyed when scrolled away and every desktop's row
         // can be found, there are only a few desktops
         cacheBuffer: (overview.rowHeight + spacing) * count
@@ -360,7 +444,7 @@ Item {
             onTapped: eventPoint => {
                 const position = eventPoint.position;
                 if (rows.itemAt(position.x + rows.contentX, position.y + rows.contentY) === null) {
-                    effect.deactivate();
+                    overview.sceneEffect.deactivate();
                 }
             }
         }
@@ -369,11 +453,11 @@ Item {
             required property int index
 
             width: rows.width
-            // the row for creating a new desktop has no windows to show, so it's smaller
-            height: desktop !== null ? overview.rowHeight : Math.round(overview.rowHeight * 0.35)
+            height: overview.rowHeight
             desktop: index < KWinComponents.Workspace.desktops.length ? KWinComponents.Workspace.desktops[index] : null
             number: index + 1
-            overviewRoot: overview
+            // the linter doesn't match a component's own type inside its file
+            overviewRoot: overview // qmllint disable incompatible-type
             selected: ListView.isCurrentItem
         }
     }
@@ -382,20 +466,22 @@ Item {
         id: dragController
         anchors.fill: parent
         z: 1
-        overviewRoot: overview
+        overviewRoot: overview // qmllint disable incompatible-type
         onDropped: (window, position, centerX, targetWindow) => overview.dropWindow(window, position, centerX, targetWindow)
     }
 
     // shows where dropping a window between two rows creates a new desktop, styled like the column insertion hint
     Kirigami.ShadowedRectangle {
-        readonly property Item rowBelow: rows.itemAtIndex(dragController.hoveredGap)
-        readonly property bool shown: dragController.hoveredGap !== -1 && rowBelow !== null
+        readonly property DesktopRow rowBelow: rows.itemAtIndex(dragController.hoveredGap) as DesktopRow
+        // after the last desktop, without a "New desktop" row below
+        readonly property DesktopRow rowAbove: rows.itemAtIndex(dragController.hoveredGap - 1) as DesktopRow
+        readonly property bool shown: dragController.hoveredGap !== -1 && (rowBelow !== null || rowAbove !== null)
 
         x: (overview.width - width) / 2
-        y: {
-            rows.contentY; // reposition while the rows move
-            return rowBelow !== null ? rowBelow.mapToItem(overview, 0, 0).y - (rows.spacing + height) / 2 : 0;
-        }
+        // depends on contentY, to reposition while the rows move
+        y: isNaN(rows.contentY) ? 0
+            : rowBelow !== null ? rowBelow.mapToItem(overview, 0, 0).y - (rows.spacing + height) / 2
+            : rowAbove !== null ? rowAbove.mapToItem(overview, 0, rowAbove.height).y + (rows.spacing - height) / 2 : 0
         z: 1
         width: overview.width * 0.5
         height: Kirigami.Units.smallSpacing * 1.5
@@ -415,7 +501,7 @@ Item {
         anchors.fill: parent
         z: 1
         enabled: searchOverlay.resultsView === null
-        overviewRoot: overview
+        overviewRoot: overview // qmllint disable incompatible-type
     }
 
     PanelsLayer {
@@ -431,8 +517,8 @@ Item {
         anchors.fill: parent
         z: 3
         searchText: overview.searchText
-        showResults: rows.currentItem === null || rows.currentItem.windowCount === 0
-        onResultActivated: effect.deactivate()
+        showResults: overview.currentRow === null || overview.currentRow.windowCount === 0
+        onResultActivated: overview.sceneEffect.deactivate()
     }
 
     onSearchTextChanged: Qt.callLater(refreshSelection)
@@ -470,15 +556,23 @@ Item {
     }
 
     Connections {
-        target: effect
+        target: overview.sceneEffect
         function onActivatedChanged() {
-            if (!effect.activated) {
-                overview.closingEnd = Date.now() + effect.animationDuration;
+            if (!overview.sceneEffect.activated) {
+                // closed some other way while gliding to a clicked window, the zoom isn't waiting for it any more
+                if (activationTimer.running) {
+                    activationTimer.stop();
+                    const row = overview.activationRow;
+                    overview.activationRow = null;
+                    if (row !== null && row.syncingScroll) {
+                        row.finishKarouselSync();
+                    }
+                }
                 overview.captureZoomOrigin();
             }
         }
         function onGestureInProgressChanged() {
-            if (effect.gestureInProgress) {
+            if (overview.sceneEffect.gestureInProgress) {
                 overview.captureZoomOrigin();
             }
         }
@@ -487,15 +581,14 @@ Item {
     Keys.forwardTo: searchOverlay.resultsView !== null ? [searchOverlay.resultsView] : []
     Keys.onPressed: event => handleKey(event)
 
+    Component.onDestruction: overview.sceneEffect.overviewDestroyed()
+
     Component.onCompleted: {
         karouselCheck.call();
         selectedWindow = KWinComponents.Workspace.activeWindow;
         rows.currentIndex = Math.max(0, KWinComponents.Workspace.desktops.indexOf(currentDesktop()));
         rows.positionViewAtIndex(rows.currentIndex, ListView.Center);
-        const row = rows.currentItem;
-        if (row !== null && selectedWindow !== null && row.hasWindow(selectedWindow)) {
-            row.centerOnWindow(selectedWindow);
-        }
+        // the current row stays centered on what's on screen, which is where the zoom starts from
         captureZoomOrigin();
         organized = true;
     }

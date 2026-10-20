@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import org.kde.kirigami as Kirigami
 import org.kde.milou as Milou
@@ -11,7 +13,8 @@ Item {
     // true when no window matches the search
     required property bool showResults
     // receives the keys while results are shown
-    readonly property Item resultsView: results.item !== null ? results.item.resultsView : null
+    // set by the results while they're loaded
+    property Item resultsView: null
 
     signal resultActivated()
 
@@ -22,7 +25,8 @@ Item {
         anchors.topMargin: Kirigami.Units.gridUnit * 4
 
         sourceComponent: Rectangle {
-            readonly property alias resultsView: milouView
+            Component.onCompleted: overlay.resultsView = milouView
+            Component.onDestruction: overlay.resultsView = null
 
             color: Qt.rgba(0, 0, 0, 0.5)
 

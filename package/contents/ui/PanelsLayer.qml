@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import org.kde.kwin as KWinComponents
 
@@ -5,8 +7,8 @@ import org.kde.kwin as KWinComponents
 Item {
     id: panels
 
-    required property QtObject screen
-    required property QtObject desktop
+    required property var screen
+    required property var desktop
     required property real zoom
 
     Repeater {
@@ -18,7 +20,7 @@ Item {
         }
 
         KWinComponents.WindowThumbnail {
-            required property QtObject window
+            required property var window
 
             wId: window.internalId
             x: window.x - panels.screen.geometry.x
