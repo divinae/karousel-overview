@@ -7,6 +7,14 @@
 - Each desktop shows its own wallpaper
 - Minimized windows at the end of their desktop, click to restore (can be turned off)
 - App icons and window titles on windows (each can be turned off)
+- Smooth panning: the preview moves smoothly and Karousel's view follows once the panning stops, without jumping
+- Clicking a window glides the view to it while zooming in, instead of jumping
+- Each desktop's wallpaper stays in the middle with rounded corners and a shadow, the windows move past it
+- Translucent windows get the blurred wallpaper behind them
+- Rounded corners on windows
+- Desktop number and name in a pill on the wallpaper's corner
+- Smaller "New desktop" card that looks like an empty desktop
+- Glowing drop hints that slide between columns
 
 ## 0.2
 First release.
