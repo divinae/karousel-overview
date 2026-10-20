@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4
+- The "New desktop" row looks like an empty desktop, with the current desktop's wallpaper see-through
+- Clicking a window centers it (can be turned off): the strip first glides to it, then the overview zooms in, without jumps
+- Desktops other than the current one show their windows in Karousel's layout instead of piled up where KWin moved them
+- Desktop labels as a pill on the wallpaper's corner, shadows that show which desktop and window float above the rest
+- Removing a desktop keeps the overview near it instead of going back to the first one
+- The "New desktop" row can be turned off; then a window dropped after the last desktop creates one
+- Restoring a minimized window shows it in its desktop's strip right away
+- The effect's settings open again, they couldn't be found
+- Window titles show on hover by default, the touchpad gesture uses 3 fingers by default, 4 clash with Plasma's Overview
+- Optionally remove the desktops created in the overview once they're empty, like GNOME's dynamic workspaces
+- Lighter rounded corners, without a mask texture per window
+- The gaps between windows are Karousel's own, in pixels, instead of a separate setting
+- The wallpaper no longer shifts when the overview opens or closes while the current desktop's strip isn't centered
+
 ## 0.3
 - Panning the current desktop scrolls Karousel's real view column by column
 - Drop a window onto another window to put it into that window's column
