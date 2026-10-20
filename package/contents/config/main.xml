@@ -13,7 +13,7 @@
         </entry>
         <entry name="WindowGap" type="Int">
             <label>Gap between windows, in pixels</label>
-            <default>12</default>
+            <default>6</default>
             <min>0</min>
             <max>64</max>
         </entry>
