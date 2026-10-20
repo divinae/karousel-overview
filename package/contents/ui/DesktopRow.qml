@@ -14,6 +14,9 @@ Item {
     readonly property rect screenGeometry: overviewRoot.screenGeometry
     readonly property real thumbScale: overviewRoot.thumbScale
     readonly property real padding: Kirigami.Units.gridUnit
+    // the desktop's wallpaper stays in the middle of the row, the windows move past it when panning, like in Niri
+    readonly property real viewportWidth: screenGeometry.width * thumbScale
+    readonly property real viewportLeft: Math.max(0, (width - viewportWidth) / 2)
     readonly property QtObject style: overviewRoot.style
 
     // horizontal extent of the strip in workspace coordinates,
@@ -25,6 +28,10 @@ Item {
     readonly property int windowCount: thumbs.count
     // where a dragged column would land, in the strip's coordinates, NaN when not dragging one
     property real insertHintX: NaN
+    // the column a dragged window would join, {x, y, width, height} in the strip's coordinates, or null
+    property var stackHint: null
+    // a dragged window would move to this desktop
+    property bool moveHint: false
     property bool editingName: false
     // panning the current desktop's row scrolls Karousel's real view by whole columns, other rows pan their preview
     readonly property bool scrollsKarousel: overviewRoot.karouselAvailable && desktop !== null && desktop === overviewRoot.activeDesktop
@@ -175,6 +182,8 @@ Item {
     }
 
     function showInsertHint(window, overviewX) {
+        stackHint = null;
+        moveHint = false;
         const drop = columnDrop(window, overviewX);
         if (drop === null || drop.target === drop.source) {
             hideInsertHint();
@@ -189,25 +198,50 @@ Item {
         insertHintX = NaN;
     }
 
+    function showStackHint(window) {
+        hideInsertHint();
+        moveHint = false;
+        const column = karouselColumns().find(column => column.windows.includes(window));
+        stackHint = column === undefined ? null : {
+            x: toStripX(column.x),
+            y: (column.y - screenGeometry.y) * thumbScale,
+            width: column.width * thumbScale,
+            height: (column.bottom - column.y) * thumbScale,
+        };
+    }
+
+    function showMoveHint() {
+        hideInsertHint();
+        stackHint = null;
+        moveHint = true;
+    }
+
+    function hideHints() {
+        hideInsertHint();
+        stackHint = null;
+        moveHint = false;
+    }
+
+    // the margins let any part of the strip, also its ends, be panned to the wallpaper in the middle
+    function minContentX() {
+        return -flick.leftMargin;
+    }
+
     function maxContentX() {
-        return Math.max(0, flick.contentWidth - flick.width);
+        return Math.max(minContentX(), flick.contentWidth - flick.width + flick.rightMargin);
     }
 
     function scrollTo(contentX) {
         snapAnimation.stop();
-        if (flick.contentWidth <= flick.width) {
-            flick.contentX = -flick.leftMargin;
-        } else {
-            flick.contentX = Layout.clamp(contentX, 0, maxContentX());
-        }
+        flick.contentX = Layout.clamp(contentX, minContentX(), maxContentX());
     }
 
-    // settles the row so that the column closest to its left edge lines up with it
+    // settles the row so that the column closest to the wallpaper's left edge lines up with it
     function snapToColumn() {
-        if (flick.contentWidth <= flick.width || columns.length === 0 || panHandler.active || flick.moving) {
+        if (columns.length === 0 || panHandler.active || flick.moving) {
             return;
         }
-        const target = Layout.snapTarget(columns.map(column => toStripX(column.x)), flick.contentX + padding, padding, maxContentX());
+        const target = Layout.snapTarget(columns.map(column => toStripX(column.x)), flick.contentX + viewportLeft, viewportLeft, minContentX(), maxContentX());
         if (target !== null) {
             snapAnimation.to = target;
             snapAnimation.restart();
@@ -249,14 +283,15 @@ Item {
         }
     }
 
-    // uses where the thumbnail goes, not where its animation currently is
+    // keeps the item within the wallpaper, uses where the thumbnail goes, not where its animation currently is
     function ensureVisible(item) {
         const x = item.layoutX ?? item.x;
         const width = item.layoutWidth ?? item.width;
-        if (x - padding < flick.contentX) {
-            scrollTo(x - padding);
-        } else if (x + width + padding > flick.contentX + flick.width) {
-            scrollTo(x + width + padding - flick.width);
+        const left = flick.contentX + viewportLeft;
+        if (x < left) {
+            scrollTo(x - viewportLeft);
+        } else if (x + width > left + viewportWidth) {
+            scrollTo(x + width - viewportWidth - viewportLeft);
         }
     }
 
@@ -395,9 +430,44 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: row.style.foregroundAlpha(row.selected ? 0.08 : 0.03)
+        color: row.moveHint ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.25)
+                            : row.style.foregroundAlpha(row.selected ? 0.08 : 0.03)
+        border.width: row.moveHint ? 3 : 0
+        border.color: Kirigami.Theme.highlightColor
         radius: Kirigami.Units.cornerRadius
         opacity: row.overviewRoot.zoom
+    }
+
+    // a shadow under the wallpaper instead of a frame around it
+    Kirigami.ShadowedRectangle {
+        x: row.viewportLeft
+        width: row.viewportWidth
+        height: row.height
+        // behind the wallpaper, only seen while it loads
+        color: Kirigami.Theme.backgroundColor
+        shadow.size: Kirigami.Units.gridUnit * 1.5
+        shadow.color: Qt.rgba(0, 0, 0, row.selected ? 0.5 : 0.3)
+        opacity: row.overviewRoot.zoom
+        visible: row.desktop !== null
+    }
+
+    // the desktop's own wallpaper behind the part of the strip that is visible on screen, like Niri's workspaces
+    Item {
+        x: row.viewportLeft
+        width: row.viewportWidth
+        height: row.height
+        clip: true
+        visible: row.desktop !== null
+
+        KWinComponents.DesktopBackground {
+            width: row.screenGeometry.width
+            height: row.screenGeometry.height
+            scale: row.thumbScale
+            transformOrigin: Item.TopLeft
+            activity: KWinComponents.Workspace.currentActivity
+            desktop: row.desktop
+            outputName: row.overviewRoot.targetScreen.name
+        }
     }
 
     Flickable {
@@ -410,8 +480,8 @@ Item {
         interactive: row.overviewRoot.draggedWindow === null && !row.scrollsKarousel
         contentWidth: Math.max((row.stripMaxX - row.stripMinX) * row.thumbScale + 2 * row.padding, row.minimizedEnd + row.padding)
         contentHeight: height
-        // center strips that are narrower than the row
-        leftMargin: Math.max(0, (width - contentWidth) / 2)
+        leftMargin: row.viewportLeft
+        rightMargin: row.viewportLeft
 
         onMovementEnded: row.snapToColumn()
         onFlickEnded: row.snapToColumn()
@@ -422,38 +492,6 @@ Item {
 
             TapHandler {
                 onTapped: row.overviewRoot.switchToDesktop(row.desktop)
-            }
-        }
-
-        // a shadow under the wallpaper instead of a frame around it
-        Kirigami.ShadowedRectangle {
-            x: viewportFrame.x
-            width: viewportFrame.width
-            height: row.height
-            // behind the wallpaper, only seen while it loads
-            color: Kirigami.Theme.backgroundColor
-            shadow.size: Kirigami.Units.gridUnit * 1.5
-            shadow.color: Qt.rgba(0, 0, 0, row.selected ? 0.5 : 0.3)
-            opacity: row.overviewRoot.zoom
-            visible: row.desktop !== null
-        }
-
-        // the desktop's own wallpaper behind the part of the strip that is visible on screen, like Niri's workspaces
-        Item {
-            x: viewportFrame.x
-            width: viewportFrame.width
-            height: row.height
-            clip: true
-            visible: row.desktop !== null
-
-            KWinComponents.DesktopBackground {
-                width: row.screenGeometry.width
-                height: row.screenGeometry.height
-                scale: row.thumbScale
-                transformOrigin: Item.TopLeft
-                activity: KWinComponents.Workspace.currentActivity
-                desktop: row.desktop
-                outputName: row.overviewRoot.targetScreen.name
             }
         }
 
@@ -484,6 +522,20 @@ Item {
             }
         }
 
+        // the column a dragged window would join
+        Rectangle {
+            x: row.stackHint !== null ? row.stackHint.x : 0
+            y: row.stackHint !== null ? row.stackHint.y : 0
+            width: row.stackHint !== null ? row.stackHint.width : 0
+            height: row.stackHint !== null ? row.stackHint.height : 0
+            z: 100000
+            radius: Kirigami.Units.cornerRadius
+            color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.3)
+            border.width: 3
+            border.color: Kirigami.Theme.highlightColor
+            visible: row.stackHint !== null
+        }
+
         Rectangle {
             x: row.insertHintX - width / 2
             width: Kirigami.Units.smallSpacing
@@ -491,7 +543,7 @@ Item {
             radius: width / 2
             color: Kirigami.Theme.highlightColor
             visible: !isNaN(row.insertHintX)
-            z: 1
+            z: 100000
         }
 
         Repeater {
@@ -572,8 +624,8 @@ Item {
 
     // the desktop's name, double-click to rename, and a button to remove it when it's empty
     Item {
-        // aligned with the viewport frame
-        x: Math.max(row.padding, viewportFrame.x - flick.contentX)
+        // aligned with the wallpaper
+        x: Math.max(row.padding, row.viewportLeft)
         anchors.bottom: parent.top
         anchors.bottomMargin: Kirigami.Units.smallSpacing
         width: header.implicitWidth

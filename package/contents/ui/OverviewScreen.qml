@@ -299,7 +299,8 @@ Item {
         dbusInterface: "org.kde.kglobalaccel.Component"
         method: "shortcutNames"
         onFinished: returnValue => {
-            overview.karouselAvailable = returnValue[0].includes(Layout.KarouselShortcuts.scrollLeftColumn);
+            // the list of names may not arrive as a JavaScript array, as a string it's a comma-separated list
+            overview.karouselAvailable = String(returnValue[0]).includes(Layout.KarouselShortcuts.scrollLeftColumn);
         }
     }
 

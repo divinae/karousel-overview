@@ -19,9 +19,12 @@ Item {
     property QtObject targetWindow: null
     // where dropping creates a new desktop when between two rows, -1 otherwise
     property int hoveredGap: -1
+    // what dropping here does, shown next to the dragged window, empty when nothing
+    property string dropAction: ""
+    // the row showing a hint of what dropping does
+    property Item hintRow: null
     // center of the dragged thumbnail, where it gets dropped
     readonly property real centerX: window !== null ? position.x - offset.x + window.frameGeometry.width * overviewRoot.thumbScale / 2 : 0
-    property Item insertHintRow: null
 
     signal dropped(QtObject window, point position, real centerX, QtObject targetWindow)
 
@@ -44,10 +47,9 @@ Item {
         }
         refresh();
         const droppedWindow = window;
-        const centerX = controller.centerX;
         const targetWindow = controller.targetWindow;
         reset();
-        dropped(droppedWindow, position, centerX, targetWindow);
+        dropped(droppedWindow, position, position.x, targetWindow);
     }
 
     // ends the drag without dropping, e.g. when the dragged window or its thumbnail goes away
@@ -58,7 +60,8 @@ Item {
     }
 
     function reset() {
-        setInsertHintRow(null);
+        setHintRow(null);
+        dropAction = "";
         window = null;
         hoveredRow = null;
         targetWindow = null;
@@ -71,29 +74,47 @@ Item {
             return;
         }
         hoveredRow = overviewRoot.rowAt(position);
-        const thumb = overviewRoot.thumbAt(position);
-        targetWindow = thumb !== null && thumb.window !== window ? thumb.window : null;
         hoveredGap = overviewRoot.gapAt(position);
-        updateInsertHint();
-    }
-
-    function setInsertHintRow(row) {
-        if (insertHintRow !== null && insertHintRow !== row) {
-            insertHintRow.hideInsertHint();
+        // over the middle of another window in the same row the window joins its column,
+        // over its sides the column moves before or after it
+        targetWindow = null;
+        if (hoveredRow !== null && hoveredRow.hasWindow(window)) {
+            const thumb = overviewRoot.thumbAt(position);
+            if (thumb !== null && thumb.window !== window) {
+                const x = thumb.mapFromItem(controller, position.x, position.y).x;
+                if (x > thumb.width / 4 && x < thumb.width * 3 / 4) {
+                    targetWindow = thumb.window;
+                }
+            }
         }
-        insertHintRow = row;
+        updateHints();
     }
 
-    // shows where the column goes when dragging a window within its own row
-    function updateInsertHint() {
+    function setHintRow(row) {
+        if (hintRow !== null && hintRow !== row) {
+            hintRow.hideHints();
+        }
+        hintRow = row;
+    }
+
+    // shows what dropping here does: the column it joins, where the column goes, or the desktop it moves to
+    function updateHints() {
         const row = hoveredRow;
-        // over another window the drop joins its column instead, which its thumbnail shows
-        if (window === null || row === null || !row.hasWindow(window) || targetWindow !== null) {
-            setInsertHintRow(null);
+        setHintRow(row);
+        if (row === null) {
+            dropAction = hoveredGap !== -1 ? "Move to a new desktop here" : "";
             return;
         }
-        setInsertHintRow(row);
-        row.showInsertHint(window, centerX);
+        if (!row.hasWindow(window)) {
+            row.showMoveHint();
+            dropAction = row.desktop !== null ? "Move to " + row.desktop.name : "Move to a new desktop";
+        } else if (targetWindow !== null) {
+            row.showStackHint(targetWindow);
+            dropAction = "Add to this column";
+        } else {
+            row.showInsertHint(window, position.x);
+            dropAction = isNaN(row.insertHintX) ? "" : "Move column here";
+        }
     }
 
     onHoveredRowChanged: hoverTimer.restart()
@@ -137,6 +158,25 @@ Item {
             if (row !== null && row.desktop !== null) {
                 controller.overviewRoot.switchToDesktopKeepingOverview(row);
             }
+        }
+    }
+
+    // what dropping here does
+    Rectangle {
+        x: controller.position.x + Kirigami.Units.gridUnit
+        y: controller.position.y + Kirigami.Units.gridUnit
+        z: 1
+        width: actionLabel.implicitWidth + 2 * Kirigami.Units.largeSpacing
+        height: actionLabel.implicitHeight + Kirigami.Units.largeSpacing
+        radius: height / 2
+        color: Kirigami.Theme.highlightColor
+        visible: controller.window !== null && controller.dropAction !== ""
+
+        Text {
+            id: actionLabel
+            anchors.centerIn: parent
+            text: controller.dropAction
+            color: Kirigami.Theme.highlightedTextColor
         }
     }
 

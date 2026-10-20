@@ -60,17 +60,18 @@ test("insertHintX without other columns has nowhere to show", () => {
 });
 
 test("snapTarget lines up the closest column with the left edge", () => {
-    assert.equal(Layout.snapTarget([10, 400, 900], 380, 10, 2000), 390);
-    assert.equal(Layout.snapTarget([10, 400, 900], 700, 10, 2000), 890);
+    assert.equal(Layout.snapTarget([10, 400, 900], 380, 10, 0, 2000), 390);
+    assert.equal(Layout.snapTarget([10, 400, 900], 700, 10, 0, 2000), 890);
 });
 
 test("snapTarget stays within the scroll range", () => {
-    assert.equal(Layout.snapTarget([10, 400, 900], 900, 10, 500), 500);
-    assert.equal(Layout.snapTarget([5], 0, 10, 500), 0);
+    assert.equal(Layout.snapTarget([10, 400, 900], 900, 10, 0, 500), 500);
+    assert.equal(Layout.snapTarget([5], 0, 10, 0, 500), 0);
+    assert.equal(Layout.snapTarget([5], 0, 300, -400, 500), -295);
 });
 
 test("snapTarget without columns has nothing to snap to", () => {
-    assert.equal(Layout.snapTarget([], 100, 10, 500), null);
+    assert.equal(Layout.snapTarget([], 100, 10, 0, 500), null);
 });
 
 test("zoom starts with the viewport frame filling the screen and ends at the overview", () => {

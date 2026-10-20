@@ -17,7 +17,7 @@ The effect doesn't talk to Karousel directly: Karousel keeps off-screen columns 
 - Double-click a desktop's name to rename it, hover the name of an empty desktop to remove it
 - Middle-click a window or use its close button to close it
 - Type to filter windows by name; if nothing matches, KRunner results are shown
-- Scroll vertically to jump between desktops, scroll horizontally (or Shift+scroll) to pan a desktop's strip
+- Scroll vertically to jump between desktops, scroll horizontally (or Shift+scroll) to move a desktop's windows past its wallpaper, which stays in place
 - Right-click and drag anywhere in a desktop's strip, also over windows, to pan it; it keeps going when you let go fast, and settles on a column
 - While dragging a window, push it against the left or right edge to scroll the strip, against the top or bottom edge to move between desktops, or hold it over a desktop to switch to it
 - Arrow keys move focus between windows and desktops (Karousel scrolls along), Enter closes the overview on the focused window, Delete closes it, Escape clears the search or closes the overview

@@ -135,16 +135,16 @@ function minimizedSlots(widths, startX, gap) {
     return { xs: xs, end: widths.length > 0 ? x - gap : startX };
 }
 
-// the scroll position that lines up the column edge closest to left with it,
-// or null if there's nothing to snap to
-function snapTarget(columnLefts, left, padding, maxContentX) {
+// the scroll position that lines up the column edge closest to left with it, where left is offset from the scroll
+// position, or null if there's nothing to snap to
+function snapTarget(columnLefts, left, offset, minContentX, maxContentX) {
     let closest = null;
     for (const x of columnLefts) {
         if (closest === null || Math.abs(x - left) < Math.abs(closest - left)) {
             closest = x;
         }
     }
-    return closest === null ? null : clamp(closest - padding, 0, maxContentX);
+    return closest === null ? null : clamp(closest - offset, minContentX, maxContentX);
 }
 
 // scale of the rows while zooming, from fullScale (a row's viewport frame fills the screen) to 1
