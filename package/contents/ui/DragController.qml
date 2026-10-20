@@ -14,13 +14,21 @@ Item {
     property point position
     property point offset
     readonly property Item hoveredRow: window !== null ? overviewRoot.rowAt(position) : null
+    // another window under the pointer, whose column the dragged window would join
+    readonly property QtObject targetWindow: {
+        if (window === null) {
+            return null;
+        }
+        const thumb = overviewRoot.thumbAt(position);
+        return thumb !== null && thumb.window !== window ? thumb.window : null;
+    }
     // where dropping creates a new desktop when between two rows, -1 otherwise
     readonly property int hoveredGap: window !== null ? overviewRoot.gapAt(position) : -1
     // center of the dragged thumbnail, where it gets dropped
     readonly property real centerX: window !== null ? position.x - offset.x + window.frameGeometry.width * overviewRoot.thumbScale / 2 : 0
     property Item insertHintRow: null
 
-    signal dropped(QtObject window, point position, real centerX)
+    signal dropped(QtObject window, point position, real centerX, QtObject targetWindow)
 
     function start(window, item, scenePosition) {
         const itemPosition = item.mapToItem(controller, 0, 0);
@@ -36,10 +44,11 @@ Item {
     function end() {
         const window = controller.window;
         const centerX = controller.centerX;
+        const targetWindow = controller.targetWindow;
         setInsertHintRow(null);
         controller.window = null;
         if (window !== null) {
-            dropped(window, position, centerX);
+            dropped(window, position, centerX, targetWindow);
         }
     }
 
@@ -53,7 +62,8 @@ Item {
     // shows where the column goes when dragging a window within its own row
     function updateInsertHint() {
         const row = hoveredRow;
-        if (window === null || row === null || !row.hasWindow(window)) {
+        // over another window the drop joins its column instead, which its thumbnail shows
+        if (window === null || row === null || !row.hasWindow(window) || targetWindow !== null) {
             setInsertHintRow(null);
             return;
         }
@@ -62,6 +72,7 @@ Item {
     }
 
     onCenterXChanged: updateInsertHint()
+    onTargetWindowChanged: updateInsertHint()
     onHoveredRowChanged: {
         updateInsertHint();
         hoverTimer.restart();
@@ -75,7 +86,7 @@ Item {
         onTriggered: {
             const speed = Layout.edgeScrollSpeed(controller.position.x, controller.width, Kirigami.Units.gridUnit * 4);
             if (speed !== 0) {
-                controller.hoveredRow?.scrollBy(speed * Kirigami.Units.gridUnit * 1.5);
+                controller.hoveredRow?.panBy(-speed * Kirigami.Units.gridUnit * 1.5);
             }
         }
     }

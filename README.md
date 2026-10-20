@@ -9,6 +9,10 @@ The effect doesn't talk to Karousel directly: Karousel keeps off-screen columns 
 - Click a window to focus it, or click an empty part of a desktop to switch to it
 - Drag a window to another desktop to move it there, or to the "New desktop" row to create one
 - Drag a window sideways within its desktop to reorder its column (uses Karousel's "Move column left/right" key bindings), a bar shows where it lands
+- Drop a window onto another window to put it into that window's column
+- Panning the current desktop scrolls Karousel's real view column by column, so that you land where you scrolled
+- Karousel's own key bindings work in the overview too, and the overview follows what they do
+- Minimized windows are shown dimmed at the end of their desktop, click one to restore it
 - Drop a window between two desktops to create a new desktop there
 - Double-click a desktop's name to rename it, hover the name of an empty desktop to remove it
 - Middle-click a window or use its close button to close it
@@ -18,7 +22,7 @@ The effect doesn't talk to Karousel directly: Karousel keeps off-screen columns 
 - While dragging a window, push it against the left or right edge to scroll the strip, against the top or bottom edge to move between desktops, or hold it over a desktop to switch to it
 - Arrow keys move focus between windows and desktops (Karousel scrolls along), Enter closes the overview on the focused window, Delete closes it, Escape clears the search or closes the overview
 
-The height of the desktop rows, the gap between windows and the touchpad gesture can be changed in the effect's settings.
+The height of the desktop rows, the gap between windows, app icons, window titles, minimized windows and the touchpad gesture can be changed in the effect's settings.
 
 ## Installation
 Requires Plasma 6.

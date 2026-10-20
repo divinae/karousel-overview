@@ -3,11 +3,21 @@
 // Pure layout logic of the overview, kept out of QML so that it can be tested with node (see tests/).
 // Rectangles are plain {x, y, width, height} objects in workspace coordinates.
 
-// Karousel's key bindings, the only way to reorder its columns from outside
+// Karousel's key bindings, the only way to control it from outside
 const KarouselShortcuts = {
     columnMoveLeft: "karousel-column-move-left",
     columnMoveRight: "karousel-column-move-right",
+    // a window alone in its column joins the neighbouring column, otherwise it leaves its column to that side
+    windowMoveLeft: "karousel-window-move-left",
+    windowMoveRight: "karousel-window-move-right",
+    // moves the view by one column, without changing focus
+    scrollLeftColumn: "karousel-grid-scroll-left-column",
+    scrollRightColumn: "karousel-grid-scroll-right-column",
 };
+
+function repeat(name, count) {
+    return Array(Math.max(0, count)).fill(name);
+}
 
 function clamp(value, min, max) {
     return Math.max(min, Math.min(value, max));
@@ -75,6 +85,54 @@ function insertHintX(columnEdges, target) {
         return columnEdges[columnEdges.length - 1].right;
     }
     return (columnEdges[target - 1].right + columnEdges[target].left) / 2;
+}
+
+// Karousel shortcuts that move the focused window from the column at index source into the column at index target;
+// columnSizes are the numbers of windows in the columns, from left to right
+function stackMoves(columnSizes, source, target) {
+    if (source === target) {
+        return [];
+    }
+    const moves = [];
+    let position = source;
+    let targetPosition = target;
+    if (columnSizes[source] > 1) {
+        // take the window out of its column first, into a new column on its right
+        moves.push(KarouselShortcuts.windowMoveRight);
+        position = source + 1;
+        if (target > source) {
+            targetPosition = target + 1;
+        }
+    }
+    if (targetPosition < position) {
+        // right next to the target column on its right, then join it
+        moves.push(...repeat(KarouselShortcuts.columnMoveLeft, position - targetPosition - 1));
+        moves.push(KarouselShortcuts.windowMoveLeft);
+    } else {
+        // right next to the target column on its left, then join it
+        moves.push(...repeat(KarouselShortcuts.columnMoveRight, targetPosition - position - 1));
+        moves.push(KarouselShortcuts.windowMoveRight);
+    }
+    return moves;
+}
+
+// turns dragging the preview by delta pixels (positive is to the right) into whole column scrolls of Karousel's view,
+// one for every threshold pixels; returns what's left of the drag and the scrolls, positive scrolls the view to the left
+function columnScrollSteps(accumulated, delta, threshold) {
+    accumulated += delta;
+    const steps = Math.trunc(accumulated / threshold);
+    return { accumulated: accumulated - steps * threshold, steps: steps };
+}
+
+// positions of minimized windows, laid out one after another from startX; returns their x and where they end
+function minimizedSlots(widths, startX, gap) {
+    const xs = [];
+    let x = startX;
+    for (const width of widths) {
+        xs.push(x);
+        x += width + gap;
+    }
+    return { xs: xs, end: widths.length > 0 ? x - gap : startX };
 }
 
 // the scroll position that lines up the column edge closest to left with it,

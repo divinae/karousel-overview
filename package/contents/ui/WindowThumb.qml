@@ -11,6 +11,7 @@ Item {
 
     readonly property rect geometry: window.frameGeometry
     readonly property bool selected: overviewRoot.selectedWindow === window
+    readonly property bool dropTarget: overviewRoot.dropTargetWindow === window
     readonly property bool showControls: hover.hovered && overviewRoot.draggedWindow === null && overviewRoot.zoom === 1
 
     // half of the gap between windows, Karousel's own gaps get too small when zoomed out,
@@ -66,29 +67,49 @@ Item {
         anchors.margins: -3
         color: "transparent"
         radius: Kirigami.Units.cornerRadius
-        border.width: 3
+        border.width: thumb.dropTarget ? 6 : 3
         border.color: Kirigami.Theme.highlightColor
-        visible: thumb.selected || hover.hovered
-        opacity: (thumb.selected ? 1 : 0.5) * thumb.overviewRoot.zoom
+        visible: thumb.selected || thumb.dropTarget || hover.hovered
+        opacity: (thumb.selected || thumb.dropTarget ? 1 : 0.5) * thumb.overviewRoot.zoom
     }
 
+    // app icon and window title, each can be turned off in the settings, the title also shows on hover
     Rectangle {
+        readonly property bool showIcon: effect.configuration.ShowIcons
+        readonly property bool showTitle: effect.configuration.ShowTitles || thumb.showControls
+        readonly property real maxWidth: thumb.width - 2 * Kirigami.Units.smallSpacing
+
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Kirigami.Units.smallSpacing
-        width: Math.min(caption.implicitWidth, thumb.width) + 2 * Kirigami.Units.smallSpacing
-        height: caption.implicitHeight + Kirigami.Units.smallSpacing
+        width: Math.min(info.implicitWidth, maxWidth) + 2 * Kirigami.Units.smallSpacing
+        height: info.implicitHeight + Kirigami.Units.smallSpacing
         radius: Kirigami.Units.cornerRadius
         color: Qt.rgba(0, 0, 0, 0.7)
-        visible: thumb.showControls
+        visible: showIcon || showTitle
+        opacity: thumb.overviewRoot.zoom
 
-        Text {
-            id: caption
+        Row {
+            id: info
             anchors.centerIn: parent
-            width: Math.min(implicitWidth, thumb.width)
-            text: thumb.window.caption
-            elide: Text.ElideRight
-            color: "white"
+            spacing: Kirigami.Units.smallSpacing
+
+            Kirigami.Icon {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Kirigami.Units.iconSizes.small
+                height: width
+                source: thumb.window.icon
+                visible: parent.parent.showIcon
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(implicitWidth, parent.parent.maxWidth - (parent.parent.showIcon ? Kirigami.Units.iconSizes.small + parent.spacing : 0))
+                text: thumb.window.caption
+                elide: Text.ElideRight
+                color: "white"
+                visible: parent.parent.showTitle
+            }
         }
     }
 

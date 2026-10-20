@@ -16,6 +16,12 @@ Item {
 
     property QtObject selectedWindow: null
     readonly property QtObject draggedWindow: dragController.window
+    // the window that a dragged window would join the column of
+    readonly property QtObject dropTargetWindow: dragController.targetWindow
+    // whether Karousel's key bindings are there to drive it
+    property bool karouselAvailable: false
+    // the current desktop of this screen, kept up to date
+    property QtObject activeDesktop: currentDesktop()
     property string searchText: ""
 
     // set once everything is laid out, so that the zoom always animates from 0
@@ -51,6 +57,11 @@ Item {
     function rowAt(point) {
         const position = rows.mapFromItem(overview, point.x, point.y);
         return rows.itemAt(position.x + rows.contentX, position.y + rows.contentY);
+    }
+
+    // the window thumbnail at a point in the overview's coordinates
+    function thumbAt(point) {
+        return rowAt(point)?.thumbAt(point) ?? null;
     }
 
     function captureZoomOrigin() {
@@ -118,14 +129,36 @@ Item {
         }
     }
 
-    // reorders columns using Karousel's own key bindings, Karousel doesn't expose any other API
-    function moveColumn(window, delta) {
-        focusWindow(window);
-        invokeShortcut.arguments = [delta < 0 ? Layout.KarouselShortcuts.columnMoveLeft : Layout.KarouselShortcuts.columnMoveRight];
-        for (let i = 0; i < Math.abs(delta); i++) {
+    // Karousel doesn't expose any API, so it's driven through its key bindings, which act on the focused window
+    function invokeKarousel(shortcuts) {
+        for (const shortcut of shortcuts) {
+            invokeShortcut.arguments = [shortcut];
             invokeShortcut.call();
         }
+    }
+
+    function moveColumn(window, delta) {
+        focusWindow(window);
+        invokeKarousel(Layout.repeat(delta < 0 ? Layout.KarouselShortcuts.columnMoveLeft : Layout.KarouselShortcuts.columnMoveRight, Math.abs(delta)));
         selectedWindow = window;
+    }
+
+    // moves a window into the column of another window on the same desktop
+    function stackWindow(window, targetWindow, row) {
+        const columns = row.columns;
+        const source = columns.findIndex(column => column.windows.includes(window));
+        const target = columns.findIndex(column => column.windows.includes(targetWindow));
+        if (source === -1 || target === -1) {
+            return;
+        }
+        focusWindow(window);
+        invokeKarousel(Layout.stackMoves(columns.map(column => column.windows.length), source, target));
+        selectedWindow = window;
+    }
+
+    // scrolls Karousel's view of the current desktop by whole columns, positive to the left
+    function scrollKarousel(columns) {
+        invokeKarousel(Layout.repeat(columns > 0 ? Layout.KarouselShortcuts.scrollLeftColumn : Layout.KarouselShortcuts.scrollRightColumn, Math.abs(columns)));
     }
 
     // moves to another row without changing focus
@@ -162,8 +195,12 @@ Item {
         dragController.end();
     }
 
-    function dropWindow(window, position, centerX) {
+    function dropWindow(window, position, centerX, targetWindow) {
         const row = rowAt(position);
+        if (row !== null && targetWindow !== null && row.hasWindow(window) && row.hasWindow(targetWindow)) {
+            stackWindow(window, targetWindow, row);
+            return;
+        }
         if (row !== null && row.hasWindow(window)) {
             row.reorderColumn(window, centerX);
             return;
@@ -246,6 +283,17 @@ Item {
         method: "invokeShortcut"
     }
 
+    KWinComponents.DBusCall {
+        id: karouselCheck
+        service: "org.kde.kglobalaccel"
+        path: "/component/kwin"
+        dbusInterface: "org.kde.kglobalaccel.Component"
+        method: "shortcutNames"
+        onFinished: returnValue => {
+            overview.karouselAvailable = returnValue[0].includes(Layout.KarouselShortcuts.scrollLeftColumn);
+        }
+    }
+
     Backdrop {
         anchors.fill: parent
         screen: overview.targetScreen
@@ -304,7 +352,7 @@ Item {
         anchors.fill: parent
         z: 1
         overviewRoot: overview
-        onDropped: (window, position, centerX) => overview.dropWindow(window, position, centerX)
+        onDropped: (window, position, centerX, targetWindow) => overview.dropWindow(window, position, centerX, targetWindow)
     }
 
     // shows where dropping a window between two rows creates a new desktop
@@ -353,6 +401,13 @@ Item {
     // the selection follows focus changes from outside the overview, e.g. Karousel's key bindings
     Connections {
         target: KWinComponents.Workspace
+        function onCurrentDesktopChanged() {
+            overview.activeDesktop = overview.currentDesktop();
+            const index = KWinComponents.Workspace.desktops.indexOf(overview.activeDesktop);
+            if (index !== -1 && overview.draggedWindow === null) {
+                rows.currentIndex = index;
+            }
+        }
         function onWindowActivated(window) {
             if (window === null || overview.draggedWindow !== null || window.desktops.length !== 1) {
                 return;
@@ -385,6 +440,7 @@ Item {
     Keys.onPressed: event => handleKey(event)
 
     Component.onCompleted: {
+        karouselCheck.call();
         selectedWindow = KWinComponents.Workspace.activeWindow;
         rows.currentIndex = Math.max(0, KWinComponents.Workspace.desktops.indexOf(currentDesktop()));
         rows.positionViewAtIndex(rows.currentIndex, ListView.Center);

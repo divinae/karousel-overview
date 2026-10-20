@@ -17,6 +17,18 @@
             <min>0</min>
             <max>64</max>
         </entry>
+        <entry name="ShowIcons" type="Bool">
+            <label>Show app icons on windows</label>
+            <default>true</default>
+        </entry>
+        <entry name="ShowTitles" type="Bool">
+            <label>Show window titles on windows</label>
+            <default>true</default>
+        </entry>
+        <entry name="ShowMinimized" type="Bool">
+            <label>Show minimized windows at the end of their desktop</label>
+            <default>true</default>
+        </entry>
         <entry name="TouchpadGesture" type="Bool">
             <label>Open and close the overview with a vertical touchpad swipe</label>
             <default>false</default>

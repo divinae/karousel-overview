@@ -26,6 +26,12 @@ Item {
     // where a dragged column would land, in the strip's coordinates, NaN when not dragging one
     property real insertHintX: NaN
     property bool editingName: false
+    // panning the current desktop's row scrolls Karousel's real view by whole columns, other rows pan their preview
+    readonly property bool scrollsKarousel: overviewRoot.karouselAvailable && desktop !== null && desktop === overviewRoot.activeDesktop
+    property real accumulatedPan: 0
+    readonly property bool showMinimized: effect.configuration.ShowMinimized && desktop !== null
+    // where the minimized windows after the strip end, in the strip's coordinates, 0 when there are none
+    property real minimizedEnd: 0
 
     Accessible.role: Accessible.List
     Accessible.name: desktop !== null ? desktop.name : "New desktop"
@@ -59,6 +65,29 @@ Item {
         stripMinX = bounds.minX;
         stripMaxX = bounds.maxX;
         columns = Layout.computeColumns(entries);
+        updateMinimized();
+        // Karousel scrolling moves the windows, not the view, keep the view where it is
+        if (scrollsKarousel && overviewRoot.draggedWindow === null) {
+            centerOnViewport();
+        }
+    }
+
+    // lays out minimized windows one after another after the strip
+    function updateMinimized() {
+        const items = [];
+        for (let i = 0; i < minimizedThumbs.count; i++) {
+            const item = minimizedThumbs.itemAt(i);
+            if (item !== null && item.visible) {
+                items.push(item);
+            }
+        }
+        if (items.length === 0) {
+            minimizedEnd = 0;
+            return;
+        }
+        const slots = Layout.minimizedSlots(items.map(item => item.width), toStripX(stripMaxX) + padding, Kirigami.Units.largeSpacing);
+        items.forEach((item, i) => item.slotX = slots.xs[i]);
+        minimizedEnd = slots.end;
     }
 
     function thumbItems() {
@@ -75,6 +104,16 @@ Item {
 
     function thumbForWindow(window) {
         return thumbItems().find(thumb => thumb.window === window) ?? null;
+    }
+
+    function thumbAt(point) {
+        for (const thumb of thumbItems()) {
+            const position = thumb.mapFromItem(overviewRoot, point.x, point.y);
+            if (thumb.contains(position)) {
+                return thumb;
+            }
+        }
+        return null;
     }
 
     function hasWindow(window) {
@@ -150,6 +189,22 @@ Item {
 
     function scrollBy(delta) {
         scrollTo(flick.contentX + delta);
+    }
+
+    // pans by delta pixels, positive moves the content to the right
+    function panBy(delta) {
+        if (!scrollsKarousel) {
+            scrollBy(-delta);
+            scheduleSnap();
+            return;
+        }
+        // a step after half of an average column, in the preview
+        const averageWidth = columns.length > 0 ? columns.reduce((sum, column) => sum + column.width, 0) / columns.length : screenGeometry.width / 2;
+        const pan = Layout.columnScrollSteps(accumulatedPan, delta, averageWidth * thumbScale / 2);
+        accumulatedPan = pan.accumulated;
+        if (pan.steps !== 0) {
+            overviewRoot.scrollKarousel(pan.steps);
+        }
     }
 
     function centerOnViewport() {
@@ -234,6 +289,7 @@ Item {
 
         property real startContentX: 0
         property real lastVelocity: 0
+        property real lastTranslation: 0
 
         target: null
         acceptedButtons: Qt.RightButton
@@ -246,6 +302,10 @@ Item {
                 flick.cancelFlick();
                 startContentX = flick.contentX;
                 lastVelocity = 0;
+                lastTranslation = 0;
+                row.accumulatedPan = 0;
+            } else if (row.scrollsKarousel) {
+                row.accumulatedPan = 0;
             } else if (Math.abs(lastVelocity) > 100) {
                 flick.flick(lastVelocity, 0);
             } else {
@@ -253,7 +313,13 @@ Item {
             }
         }
         onTranslationChanged: {
-            if (active) {
+            if (!active) {
+                return;
+            }
+            if (row.scrollsKarousel) {
+                row.panBy(translation.x - lastTranslation);
+                lastTranslation = translation.x;
+            } else {
                 row.scrollTo(startContentX - translation.x);
             }
         }
@@ -277,6 +343,16 @@ Item {
         windowModel: KWinComponents.WindowModel {}
     }
 
+    KWinComponents.WindowFilterModel {
+        id: minimizedFilterModel
+        activity: KWinComponents.Workspace.currentActivity
+        desktop: row.desktop
+        filter: row.overviewRoot.searchText
+        minimizedWindows: true
+        windowType: KWinComponents.WindowFilterModel.Normal | KWinComponents.WindowFilterModel.Dialog
+        windowModel: KWinComponents.WindowModel {}
+    }
+
     Rectangle {
         anchors.fill: parent
         color: row.style.foregroundAlpha(row.selected ? 0.08 : 0.03)
@@ -290,8 +366,9 @@ Item {
         clip: true
         flickableDirection: Flickable.HorizontalFlick
         boundsBehavior: Flickable.StopAtBounds
-        interactive: row.overviewRoot.draggedWindow === null
-        contentWidth: (row.stripMaxX - row.stripMinX) * row.thumbScale + 2 * row.padding
+        // the current desktop's row follows Karousel's view instead
+        interactive: row.overviewRoot.draggedWindow === null && !row.scrollsKarousel
+        contentWidth: Math.max((row.stripMaxX - row.stripMinX) * row.thumbScale + 2 * row.padding, row.minimizedEnd + row.padding)
         contentHeight: height
         // center strips that are narrower than the row
         leftMargin: Math.max(0, (width - contentWidth) / 2)
@@ -305,6 +382,25 @@ Item {
 
             TapHandler {
                 onTapped: row.overviewRoot.switchToDesktop(row.desktop)
+            }
+        }
+
+        // the desktop's own wallpaper behind the part of the strip that is visible on screen, like Niri's workspaces
+        Item {
+            x: viewportFrame.x
+            width: viewportFrame.width
+            height: row.height
+            clip: true
+            visible: row.desktop !== null
+
+            KWinComponents.DesktopBackground {
+                width: row.screenGeometry.width
+                height: row.screenGeometry.height
+                scale: row.thumbScale
+                transformOrigin: Item.TopLeft
+                activity: KWinComponents.Workspace.currentActivity
+                desktop: row.desktop
+                outputName: row.overviewRoot.targetScreen.name
             }
         }
 
@@ -361,6 +457,58 @@ Item {
 
             onItemAdded: row.updateBounds()
             onItemRemoved: row.updateBounds()
+        }
+
+        // minimized windows, smaller and dimmed after the strip, click one to restore it
+        Repeater {
+            id: minimizedThumbs
+            model: row.showMinimized ? minimizedFilterModel : null
+
+            delegate: Item {
+                id: minimizedThumb
+
+                required property QtObject window
+                property real slotX: 0
+
+                x: slotX
+                y: (row.height - height) / 2
+                width: window.frameGeometry.width * row.thumbScale * 0.6
+                height: window.frameGeometry.height * row.thumbScale * 0.6
+                visible: window.minimized && (!row.overviewRoot.multipleScreens || window.output === row.overviewRoot.targetScreen)
+                opacity: (minimizedHover.hovered ? 0.9 : 0.5) * row.overviewRoot.zoom
+
+                Accessible.role: Accessible.Button
+                Accessible.name: window.caption
+
+                onVisibleChanged: row.updateMinimized()
+                onWidthChanged: row.updateMinimized()
+
+                KWinComponents.WindowThumbnail {
+                    anchors.fill: parent
+                    wId: minimizedThumb.window.internalId
+                }
+
+                Kirigami.Icon {
+                    anchors.centerIn: parent
+                    width: Kirigami.Units.iconSizes.medium
+                    height: width
+                    source: "window-minimize"
+                }
+
+                HoverHandler {
+                    id: minimizedHover
+                }
+
+                TapHandler {
+                    onTapped: {
+                        minimizedThumb.window.minimized = false;
+                        row.overviewRoot.focusWindow(minimizedThumb.window);
+                    }
+                }
+            }
+
+            onItemAdded: row.updateMinimized()
+            onItemRemoved: row.updateMinimized()
         }
     }
 

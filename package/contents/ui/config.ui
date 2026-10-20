@@ -62,13 +62,44 @@
     </widget>
    </item>
    <item row="2" column="0">
+    <widget class="QLabel" name="labelShow">
+     <property name="text">
+      <string>Show:</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="1">
+    <widget class="QCheckBox" name="kcfg_ShowIcons">
+     <property name="text">
+      <string>App icons</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="1">
+    <widget class="QCheckBox" name="kcfg_ShowTitles">
+     <property name="text">
+      <string>Window titles</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="1">
+    <widget class="QCheckBox" name="kcfg_ShowMinimized">
+     <property name="text">
+      <string>Minimized windows</string>
+     </property>
+     <property name="toolTip">
+      <string>Minimized windows are shown dimmed at the end of their desktop, click one to restore it</string>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="0">
     <widget class="QLabel" name="labelGesture">
      <property name="text">
       <string>Touchpad gesture:</string>
      </property>
     </widget>
    </item>
-   <item row="2" column="1">
+   <item row="5" column="1">
     <widget class="QCheckBox" name="kcfg_TouchpadGesture">
      <property name="text">
       <string>Swipe up to open, down to close</string>
@@ -78,7 +109,7 @@
      </property>
     </widget>
    </item>
-   <item row="3" column="0">
+   <item row="6" column="0">
     <widget class="QLabel" name="labelFingers">
      <property name="text">
       <string>Fingers:</string>
@@ -88,7 +119,7 @@
      </property>
     </widget>
    </item>
-   <item row="3" column="1">
+   <item row="6" column="1">
     <widget class="QSpinBox" name="kcfg_GestureFingerCount">
      <property name="minimum">
       <number>3</number>
@@ -101,7 +132,7 @@
      </property>
     </widget>
    </item>
-   <item row="4" column="0" colspan="2">
+   <item row="7" column="0" colspan="2">
     <widget class="QLabel" name="labelScreenEdges">
      <property name="text">
       <string>Screen edges that toggle the overview can be set in System Settings, under Screen Edges.</string>

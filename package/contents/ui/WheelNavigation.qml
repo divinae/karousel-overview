@@ -22,8 +22,7 @@ Item {
             if (deltaX !== 0) {
                 const position = navigation.mapToItem(navigation.overviewRoot, point.position.x, point.position.y);
                 const row = navigation.overviewRoot.rowAt(position) ?? navigation.overviewRoot.currentRow;
-                row?.scrollBy(-deltaX);
-                row?.scheduleSnap();
+                row?.panBy(deltaX);
             }
 
             const wheel = Layout.wheelStep(accumulatedY, deltaY);

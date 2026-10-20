@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3
+- Panning the current desktop scrolls Karousel's real view column by column
+- Drop a window onto another window to put it into that window's column
+- The overview follows desktop switches, e.g. from Karousel's key bindings, which work in the overview too
+- Each desktop shows its own wallpaper
+- Minimized windows at the end of their desktop, click to restore (can be turned off)
+- App icons and window titles on windows (each can be turned off)
+
 ## 0.2
 First release.
 
