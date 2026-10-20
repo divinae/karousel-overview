@@ -319,8 +319,10 @@ Item {
         spacing: Kirigami.Units.gridUnit * 2
         interactive: overview.draggedWindow === null
         highlightRangeMode: ListView.StrictlyEnforceRange
-        preferredHighlightBegin: (height - overview.rowHeight) / 2
-        preferredHighlightEnd: preferredHighlightBegin + overview.rowHeight
+        // the current row in the middle, the new desktop row is smaller than the others
+        readonly property real currentRowHeight: currentItem !== null ? currentItem.height : overview.rowHeight
+        preferredHighlightBegin: (height - currentRowHeight) / 2
+        preferredHighlightEnd: preferredHighlightBegin + currentRowHeight
         highlightMoveDuration: effect.animationDuration
         // keep all rows around, so that a dragged window's row isn't destroyed when scrolled away and every desktop's row
         // can be found, there are only a few desktops
@@ -353,7 +355,8 @@ Item {
             required property int index
 
             width: rows.width
-            height: overview.rowHeight
+            // the row for creating a new desktop has no windows to show, so it's smaller
+            height: desktop !== null ? overview.rowHeight : Math.round(overview.rowHeight * 0.35)
             desktop: index < KWinComponents.Workspace.desktops.length ? KWinComponents.Workspace.desktops[index] : null
             overviewRoot: overview
             selected: ListView.isCurrentItem

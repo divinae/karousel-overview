@@ -18,6 +18,8 @@ Item {
     // the desktop's wallpaper stays in the middle of the row, the windows move past it when panning, like in Niri
     readonly property real viewportWidth: screenGeometry.width * thumbScale
     readonly property real viewportLeft: Math.max(0, (width - viewportWidth) / 2)
+    // the row for creating a new desktop is a small card in the middle, with the proportions of a desktop
+    readonly property real newDesktopWidth: viewportWidth * height / Math.max(1, overviewRoot.rowHeight)
     // rounded once zoomed out, square when it fills the screen at the start of the zoom
     readonly property real wallpaperRadius: Kirigami.Units.largeSpacing * 1.5 * overviewRoot.zoom
     readonly property QtObject style: overviewRoot.style
@@ -464,7 +466,9 @@ Item {
     }
 
     Rectangle {
-        anchors.fill: parent
+        x: row.desktop !== null ? 0 : (row.width - width) / 2
+        width: row.desktop !== null ? row.width : row.newDesktopWidth
+        height: row.height
         color: row.moveHint ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.25)
                             : row.style.foregroundAlpha(row.selected ? 0.08 : 0.03)
         border.width: row.moveHint ? 3 : 0
@@ -691,13 +695,13 @@ Item {
         text: "+"
         color: row.style.foreground
         opacity: (row.selected ? 0.8 : 0.4) * row.overviewRoot.zoom
-        font.pointSize: Kirigami.Theme.defaultFont.pointSize * 4
+        font.pointSize: Kirigami.Theme.defaultFont.pointSize * 3
     }
 
     // the desktop's name, double-click to rename, and a button to remove it when it's empty
     Item {
-        // aligned with the wallpaper
-        x: Math.max(row.padding, row.viewportLeft)
+        // aligned with the wallpaper, or the new desktop card
+        x: Math.max(row.padding, row.desktop !== null ? row.viewportLeft : (row.width - row.newDesktopWidth) / 2)
         anchors.bottom: parent.top
         anchors.bottomMargin: Kirigami.Units.smallSpacing
         width: header.implicitWidth
