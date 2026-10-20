@@ -10,6 +10,24 @@ KWinComponents.SceneEffect {
 
     delegate: OverviewScreen {}
 
+    Instantiator {
+        model: effect.configuration.BorderActivate
+        KWinComponents.ScreenEdgeHandler {
+            mode: KWinComponents.ScreenEdgeHandler.Pointer
+            edge: modelData
+            onActivated: effect.toggle()
+        }
+    }
+
+    Instantiator {
+        model: effect.configuration.TouchBorderActivate
+        KWinComponents.ScreenEdgeHandler {
+            mode: KWinComponents.ScreenEdgeHandler.Touch
+            edge: modelData
+            onActivated: effect.toggle()
+        }
+    }
+
     KWinComponents.ShortcutHandler {
         name: "Karousel Overview"
         text: "Karousel: Toggle overview"

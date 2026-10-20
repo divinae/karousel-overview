@@ -17,5 +17,7 @@
         "BugReportUrl": "https://github.com/peterfajdiga/karousel/issues"
     },
     "X-Plasma-API": "declarativescript",
-    "X-Plasma-API-Minimum-Version": "6.0"
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-KDE-ConfigModule": "kwin/effects/configs/kcm_kwin4_genericscripted",
+    "X-KWin-Border-Activate": true
 }

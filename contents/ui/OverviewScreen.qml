@@ -8,7 +8,7 @@ Item {
 
     readonly property QtObject targetScreen: KWinComponents.SceneView.screen
     readonly property rect screenGeometry: targetScreen.geometry
-    readonly property real rowHeight: Math.round(height * 0.28)
+    readonly property real rowHeight: Math.round(height * effect.configuration.RowHeight / 100)
     readonly property real thumbScale: rowHeight / screenGeometry.height
 
     property QtObject selectedWindow: null
