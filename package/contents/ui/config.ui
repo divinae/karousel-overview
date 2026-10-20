@@ -36,13 +36,39 @@
     </widget>
    </item>
    <item row="1" column="0">
+    <widget class="QLabel" name="labelWindowGap">
+     <property name="text">
+      <string>Gap between windows:</string>
+     </property>
+     <property name="buddy">
+      <cstring>kcfg_WindowGap</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="QSpinBox" name="kcfg_WindowGap">
+     <property name="suffix">
+      <string> px</string>
+     </property>
+     <property name="minimum">
+      <number>0</number>
+     </property>
+     <property name="maximum">
+      <number>64</number>
+     </property>
+     <property name="value">
+      <number>12</number>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
     <widget class="QLabel" name="labelGesture">
      <property name="text">
       <string>Touchpad gesture:</string>
      </property>
     </widget>
    </item>
-   <item row="1" column="1">
+   <item row="2" column="1">
     <widget class="QCheckBox" name="kcfg_TouchpadGesture">
      <property name="text">
       <string>Swipe up to open, down to close</string>
@@ -52,7 +78,7 @@
      </property>
     </widget>
    </item>
-   <item row="2" column="0">
+   <item row="3" column="0">
     <widget class="QLabel" name="labelFingers">
      <property name="text">
       <string>Fingers:</string>
@@ -62,7 +88,7 @@
      </property>
     </widget>
    </item>
-   <item row="2" column="1">
+   <item row="3" column="1">
     <widget class="QSpinBox" name="kcfg_GestureFingerCount">
      <property name="minimum">
       <number>3</number>
@@ -75,7 +101,7 @@
      </property>
     </widget>
    </item>
-   <item row="3" column="0" colspan="2">
+   <item row="4" column="0" colspan="2">
     <widget class="QLabel" name="labelScreenEdges">
      <property name="text">
       <string>Screen edges that toggle the overview can be set in System Settings, under Screen Edges.</string>

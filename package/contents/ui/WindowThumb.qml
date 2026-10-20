@@ -13,10 +13,14 @@ Item {
     readonly property bool selected: overviewRoot.selectedWindow === window
     readonly property bool showControls: hover.hovered && overviewRoot.draggedWindow === null && overviewRoot.zoom === 1
 
-    x: strip.toStripX(geometry.x)
-    y: (geometry.y - strip.screenGeometry.y) * strip.thumbScale
-    width: geometry.width * strip.thumbScale
-    height: geometry.height * strip.thumbScale
+    // half of the gap between windows, Karousel's own gaps get too small when zoomed out,
+    // grows with the zoom so that the zoom animation starts with windows at their real positions
+    readonly property real inset: overviewRoot.zoom * Math.min(effect.configuration.WindowGap / 2, geometry.width * strip.thumbScale / 4, geometry.height * strip.thumbScale / 4)
+
+    x: strip.toStripX(geometry.x) + inset
+    y: (geometry.y - strip.screenGeometry.y) * strip.thumbScale + inset
+    width: geometry.width * strip.thumbScale - 2 * inset
+    height: geometry.height * strip.thumbScale - 2 * inset
     z: window.stackingOrder
     visible: window.normalWindow && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen)
     opacity: overviewRoot.draggedWindow === window ? 0.3 : 1
