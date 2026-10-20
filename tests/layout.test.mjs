@@ -7,7 +7,7 @@ import vm from "node:vm";
 const source = readFileSync(new URL("../package/contents/ui/layout.js", import.meta.url), "utf8")
     .replace(/^\.pragma library$/m, "");
 const Layout = {};
-vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed });", { exports: Layout });
+vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed });", { exports: Layout });
 
 const rect = (x, y, width, height) => ({ x, y, width, height });
 // objects from the vm context have that context's prototypes, which deepEqual tells apart
@@ -45,6 +45,18 @@ test("reorderTarget counts the other columns left of the drop point", () => {
     assert.equal(Layout.reorderTarget(centers, 1, 0), 0);
     assert.equal(Layout.reorderTarget(centers, 1, 1000), 3);
     assert.equal(Layout.reorderTarget(centers, 2, 500), 2);
+});
+
+test("insertHintX is between the neighbouring columns", () => {
+    const edges = [{ left: 0, right: 100 }, { left: 110, right: 300 }, { left: 310, right: 400 }];
+    assert.equal(Layout.insertHintX(edges, 0), 0);
+    assert.equal(Layout.insertHintX(edges, 1), 105);
+    assert.equal(Layout.insertHintX(edges, 2), 305);
+    assert.equal(Layout.insertHintX(edges, 3), 400);
+});
+
+test("insertHintX without other columns has nowhere to show", () => {
+    assert.equal(Layout.insertHintX([], 0), null);
 });
 
 test("snapTarget lines up the closest column with the left edge", () => {

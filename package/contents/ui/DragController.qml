@@ -14,6 +14,11 @@ Item {
     property point position
     property point offset
     readonly property Item hoveredRow: window !== null ? overviewRoot.rowAt(position) : null
+    // where dropping creates a new desktop when between two rows, -1 otherwise
+    readonly property int hoveredGap: window !== null ? overviewRoot.gapAt(position) : -1
+    // center of the dragged thumbnail, where it gets dropped
+    readonly property real centerX: window !== null ? position.x - offset.x + window.frameGeometry.width * overviewRoot.thumbScale / 2 : 0
+    property Item insertHintRow: null
 
     signal dropped(QtObject window, point position, real centerX)
 
@@ -30,10 +35,36 @@ Item {
 
     function end() {
         const window = controller.window;
+        const centerX = controller.centerX;
+        setInsertHintRow(null);
         controller.window = null;
         if (window !== null) {
-            dropped(window, position, position.x - offset.x + window.frameGeometry.width * overviewRoot.thumbScale / 2);
+            dropped(window, position, centerX);
         }
+    }
+
+    function setInsertHintRow(row) {
+        if (insertHintRow !== null && insertHintRow !== row) {
+            insertHintRow.hideInsertHint();
+        }
+        insertHintRow = row;
+    }
+
+    // shows where the column goes when dragging a window within its own row
+    function updateInsertHint() {
+        const row = hoveredRow;
+        if (window === null || row === null || !row.hasWindow(window)) {
+            setInsertHintRow(null);
+            return;
+        }
+        setInsertHintRow(row);
+        row.showInsertHint(window, centerX);
+    }
+
+    onCenterXChanged: updateInsertHint()
+    onHoveredRowChanged: {
+        updateInsertHint();
+        hoverTimer.restart();
     }
 
     // pushing it against the left or right edge scrolls the row under it
@@ -65,7 +96,6 @@ Item {
     }
 
     // holding it over another desktop switches to that desktop
-    onHoveredRowChanged: hoverTimer.restart()
     Timer {
         id: hoverTimer
         interval: 700

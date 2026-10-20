@@ -60,8 +60,20 @@ Item {
         }
     }
 
-    function createDesktop() {
-        const position = KWinComponents.Workspace.desktops.length;
+    // where a new desktop would be inserted for a point in the gap between two rows, or -1
+    function gapAt(point) {
+        if (rowAt(point) !== null) {
+            return -1;
+        }
+        const above = rowAt(Qt.point(point.x, point.y - rows.spacing));
+        const below = rowAt(Qt.point(point.x, point.y + rows.spacing));
+        if (below === null || below.desktop === null || (above === null && below.index !== 0)) {
+            return -1;
+        }
+        return below.index;
+    }
+
+    function createDesktop(position = KWinComponents.Workspace.desktops.length) {
         KWinComponents.Workspace.createDesktop(position, "");
         return KWinComponents.Workspace.desktops[position];
     }
@@ -153,6 +165,12 @@ Item {
     function dropWindow(window, position, centerX) {
         const row = rowAt(position);
         if (row === null) {
+            // dropping between two rows creates a new desktop there
+            const gap = gapAt(position);
+            if (gap !== -1) {
+                window.desktops = [createDesktop(gap)];
+                selectedWindow = window;
+            }
             return;
         }
         if (row.hasWindow(window)) {
@@ -278,6 +296,23 @@ Item {
         z: 1
         overviewRoot: overview
         onDropped: (window, position, centerX) => overview.dropWindow(window, position, centerX)
+    }
+
+    // shows where dropping a window between two rows creates a new desktop
+    Rectangle {
+        readonly property Item rowBelow: rows.itemAtIndex(dragController.hoveredGap)
+
+        x: Kirigami.Units.gridUnit
+        y: {
+            rows.contentY; // reposition while the rows move
+            return rowBelow !== null ? rowBelow.mapToItem(overview, 0, 0).y - (rows.spacing + height) / 2 : 0;
+        }
+        z: 1
+        width: overview.width - 2 * Kirigami.Units.gridUnit
+        height: Kirigami.Units.smallSpacing
+        radius: height / 2
+        color: Kirigami.Theme.highlightColor
+        visible: dragController.hoveredGap !== -1 && rowBelow !== null
     }
 
     WheelNavigation {

@@ -40,6 +40,8 @@ chmod +x "$state/session.sh"
 
 export XDG_CONFIG_HOME="$state/config"
 export XDG_CACHE_HOME="$state/cache"
+# log to stderr instead of the journal, so that the nested KWin's messages end up in its output
+export QT_FORCE_STDERR_LOGGING=1
 unset WAYLAND_DISPLAY DISPLAY
 
 exec dbus-run-session -- kwin_wayland --virtual --width 1920 --height 1080 --no-lockscreen \

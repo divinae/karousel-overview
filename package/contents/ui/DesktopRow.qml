@@ -23,6 +23,31 @@ Item {
     // windows grouped by column, sorted from left to right
     property var columns: []
     readonly property int windowCount: thumbs.count
+    // where a dragged column would land, in the strip's coordinates, NaN when not dragging one
+    property real insertHintX: NaN
+    property bool editingName: false
+
+    Accessible.role: Accessible.List
+    Accessible.name: desktop !== null ? desktop.name : "New desktop"
+
+    function startRenaming() {
+        editingName = true;
+        nameInput.text = desktop.name;
+        nameInput.forceActiveFocus();
+        nameInput.selectAll();
+    }
+
+    function finishRenaming(apply) {
+        if (!editingName) {
+            return;
+        }
+        editingName = false;
+        const name = nameInput.text.trim();
+        if (apply && name !== "") {
+            desktop.name = name;
+        }
+        overviewRoot.forceActiveFocus();
+    }
 
     function toStripX(x) {
         return (x - stripMinX) * thumbScale + padding;
@@ -60,16 +85,38 @@ Item {
         return viewportFrame.mapToItem(item, 0, 0);
     }
 
-    function reorderColumn(window, overviewX) {
+    // where the column of a window dropped at overviewX goes, or null if the window isn't in this row
+    function columnDrop(window, overviewX) {
         const source = columns.findIndex(column => column.windows.includes(window));
         if (source === -1) {
-            return;
+            return null;
         }
         const dropX = flick.contentItem.mapFromItem(overviewRoot, overviewX, 0).x;
         const target = Layout.reorderTarget(columns.map(column => toStripX(column.x + column.width / 2)), source, dropX);
-        if (target !== source) {
-            overviewRoot.moveColumn(window, target - source);
+        return { source: source, target: target };
+    }
+
+    function reorderColumn(window, overviewX) {
+        hideInsertHint();
+        const drop = columnDrop(window, overviewX);
+        if (drop !== null && drop.target !== drop.source) {
+            overviewRoot.moveColumn(window, drop.target - drop.source);
         }
+    }
+
+    function showInsertHint(window, overviewX) {
+        const drop = columnDrop(window, overviewX);
+        if (drop === null || drop.target === drop.source) {
+            hideInsertHint();
+            return;
+        }
+        const otherColumns = columns.filter((column, i) => i !== drop.source)
+            .map(column => ({ left: toStripX(column.x), right: toStripX(column.x + column.width) }));
+        insertHintX = Layout.insertHintX(otherColumns, drop.target) ?? NaN;
+    }
+
+    function hideInsertHint() {
+        insertHintX = NaN;
     }
 
     function maxContentX() {
@@ -293,6 +340,16 @@ Item {
             }
         }
 
+        Rectangle {
+            x: row.insertHintX - width / 2
+            width: Kirigami.Units.smallSpacing
+            height: row.height
+            radius: width / 2
+            color: Kirigami.Theme.highlightColor
+            visible: !isNaN(row.insertHintX)
+            z: 1
+        }
+
         Repeater {
             id: thumbs
             model: row.desktop !== null ? windowFilterModel : null
@@ -316,16 +373,80 @@ Item {
         font.pointSize: Kirigami.Theme.defaultFont.pointSize * 4
     }
 
-    Text {
+    // the desktop's name, double-click to rename, and a button to remove it when it's empty
+    Item {
         // aligned with the viewport frame
         x: Math.max(row.padding, viewportFrame.x - flick.contentX)
         anchors.bottom: parent.top
         anchors.bottomMargin: Kirigami.Units.smallSpacing
-        text: row.desktop !== null ? row.desktop.name : "New desktop"
-        font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.3
-        font.bold: row.selected
-        color: row.style.foreground
-        opacity: (row.selected ? 1 : 0.6) * row.overviewRoot.zoom
+        width: header.implicitWidth
+        height: header.implicitHeight
+        opacity: row.overviewRoot.zoom
+
+        HoverHandler {
+            id: headerHover
+        }
+
+        Row {
+            id: header
+            spacing: Kirigami.Units.smallSpacing
+
+            Text {
+                id: nameLabel
+                visible: !row.editingName
+                text: row.desktop !== null ? row.desktop.name : "New desktop"
+                font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.3
+                font.bold: row.selected
+                color: row.style.foreground
+                opacity: row.selected ? 1 : 0.6
+
+                TapHandler {
+                    enabled: row.desktop !== null
+                    onDoubleTapped: row.startRenaming()
+                }
+            }
+
+            TextInput {
+                id: nameInput
+                visible: row.editingName
+                font: nameLabel.font
+                color: row.style.foreground
+                selectByMouse: true
+                onAccepted: row.finishRenaming(true)
+                onActiveFocusChanged: {
+                    if (!activeFocus) {
+                        row.finishRenaming(true);
+                    }
+                }
+                Keys.onEscapePressed: row.finishRenaming(false)
+            }
+
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Kirigami.Units.iconSizes.small
+                height: width
+                radius: width / 2
+                color: removeHover.hovered ? "#da4453" : row.style.foregroundAlpha(0.2)
+                // the window count is filtered by the search, so don't offer removing while searching
+                visible: headerHover.hovered && !row.editingName && row.desktop !== null && row.windowCount === 0
+                         && row.overviewRoot.searchText === "" && KWinComponents.Workspace.desktops.length > 1
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "✕"
+                    color: removeHover.hovered ? "white" : row.style.foreground
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                }
+
+                HoverHandler {
+                    id: removeHover
+                }
+
+                TapHandler {
+                    onTapped: KWinComponents.Workspace.removeDesktop(row.desktop)
+                }
+            }
+        }
     }
 
     Component.onCompleted: {

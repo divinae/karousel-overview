@@ -62,6 +62,21 @@ function reorderTarget(columnCenters, source, dropX) {
     return target;
 }
 
+// where to show the insertion hint for a column moved to target, between the other columns;
+// columnEdges are the {left, right} of the other columns, sorted, or null if there are none
+function insertHintX(columnEdges, target) {
+    if (columnEdges.length === 0) {
+        return null;
+    }
+    if (target <= 0) {
+        return columnEdges[0].left;
+    }
+    if (target >= columnEdges.length) {
+        return columnEdges[columnEdges.length - 1].right;
+    }
+    return (columnEdges[target - 1].right + columnEdges[target].left) / 2;
+}
+
 // the scroll position that lines up the column edge closest to left with it,
 // or null if there's nothing to snap to
 function snapTarget(columnLefts, left, padding, maxContentX) {

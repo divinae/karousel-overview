@@ -25,6 +25,29 @@ Item {
     visible: window.normalWindow && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen)
     opacity: overviewRoot.draggedWindow === window ? 0.3 : 1
 
+    Accessible.role: Accessible.Button
+    Accessible.name: window.caption
+    Accessible.focused: selected
+
+    // follow Karousel's rearranging smoothly, but not while zooming or dragging, when the position has to be exact
+    readonly property bool animateMovement: overviewRoot.zoom === 1 && overviewRoot.draggedWindow === null
+    Behavior on x {
+        enabled: thumb.animateMovement
+        NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic }
+    }
+    Behavior on y {
+        enabled: thumb.animateMovement
+        NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic }
+    }
+    Behavior on width {
+        enabled: thumb.animateMovement
+        NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic }
+    }
+    Behavior on height {
+        enabled: thumb.animateMovement
+        NumberAnimation { duration: Kirigami.Units.longDuration; easing.type: Easing.OutCubic }
+    }
+
     onGeometryChanged: {
         strip.updateBounds();
         if (selected) {

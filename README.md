@@ -8,7 +8,9 @@ The effect doesn't talk to Karousel directly: Karousel keeps off-screen columns 
 - Toggle with Meta+Ctrl+O, a screen edge (System Settings → Screen Edges) or a touchpad swipe up (enable in the effect's settings)
 - Click a window to focus it, or click an empty part of a desktop to switch to it
 - Drag a window to another desktop to move it there, or to the "New desktop" row to create one
-- Drag a window sideways within its desktop to reorder its column (uses Karousel's "Move column left/right" key bindings)
+- Drag a window sideways within its desktop to reorder its column (uses Karousel's "Move column left/right" key bindings), a bar shows where it lands
+- Drop a window between two desktops to create a new desktop there
+- Double-click a desktop's name to rename it, hover the name of an empty desktop to remove it
 - Middle-click a window or use its close button to close it
 - Type to filter windows by name; if nothing matches, KRunner results are shown
 - Scroll vertically to jump between desktops, scroll horizontally (or Shift+scroll) to pan a desktop's strip
