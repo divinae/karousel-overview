@@ -20,8 +20,10 @@ Item {
 
     // on each side, what makes the gaps between the shrunk windows as big as Karousel's are on screen,
     // grows with the zoom so that the zoom animation starts with windows at their real positions
-    readonly property real insetX: overviewRoot.zoom * Math.min(overviewRoot.horizontalGap * (1 - strip.thumbScale) / 2, geometry.width * strip.thumbScale / 4)
-    readonly property real insetY: overviewRoot.zoom * Math.min(overviewRoot.verticalGap * (1 - strip.thumbScale) / 2, geometry.height * strip.thumbScale / 4)
+    readonly property real restingInsetX: Math.min(overviewRoot.horizontalGap * (1 - strip.thumbScale) / 2, geometry.width * strip.thumbScale / 4)
+    readonly property real restingInsetY: Math.min(overviewRoot.verticalGap * (1 - strip.thumbScale) / 2, geometry.height * strip.thumbScale / 4)
+    readonly property real insetX: overviewRoot.zoom * restingInsetX
+    readonly property real insetY: overviewRoot.zoom * restingInsetY
 
     // where the thumbnail goes, x and width follow it with an animation
     readonly property real layoutX: strip.toStripX(geometry.x) + insetX
@@ -91,10 +93,15 @@ Item {
         opacity: thumb.overviewRoot.zoom
     }
 
-    // the window and the blur behind it, with rounded corners
+    // the window and the blur behind it, with rounded corners; rendered twice as large as shown, so that shrinking it
+    // averages pixels and small text stays whole instead of losing pixels, mipmaps would blur it;
+    // without rounding, at the ends of the zoom, the window is drawn at its full resolution
     Item {
         anchors.fill: parent
         layer.enabled: thumb.overviewRoot.windowRadius > 0
+        layer.textureSize: thumb.overviewRoot.thumbTextureSize(thumb.geometry.width * thumb.strip.thumbScale - 2 * thumb.restingInsetX,
+                                                               thumb.geometry.height * thumb.strip.thumbScale - 2 * thumb.restingInsetY)
+        layer.smooth: true
         layer.effect: RoundedCorners {
             radius: thumb.overviewRoot.windowRadius
         }

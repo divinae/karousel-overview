@@ -11,7 +11,7 @@
         "Category": "Window Management",
         "EnabledByDefault": false,
         "Id": "karousel_overview",
-        "Version": "0.5",
+        "Version": "0.5.1",
         "License": "GPLv3",
         "Website": "https://github.com/divinae/karousel-overview",
         "BugReportUrl": "https://github.com/divinae/karousel-overview/issues"

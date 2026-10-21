@@ -878,7 +878,10 @@ Item {
                 KWinComponents.WindowThumbnail {
                     anchors.fill: parent
                     wId: minimizedThumb.window.internalId
+                    // larger like the other thumbnails, see WindowThumb
                     layer.enabled: row.overviewRoot.windowRadius > 0
+                    layer.textureSize: row.overviewRoot.thumbTextureSize(width, height)
+                    layer.smooth: true
                     layer.effect: RoundedCorners {
                         radius: row.overviewRoot.windowRadius * 0.6
                     }

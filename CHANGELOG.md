@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.5.1
+- Small text in the window thumbnails, also the dragged one, stays whole instead of jagged, they are rendered twice as large and scaled down
+
 ## 0.5
 - Desktop minimap along the right edge, or the top: it slides out when the pointer reaches that edge (or is always shown), click a desktop to go there, and while dragging a window it's always shown, drop it on any desktop, also one far away (can be turned off)
 - Drag windows from the minimap too, e.g. from a desktop far away to the one shown

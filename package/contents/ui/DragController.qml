@@ -233,6 +233,9 @@ Item {
             height: controller.window.frameGeometry.height * controller.overviewRoot.thumbScale
             opacity: 0.8
             layer.enabled: true
+            // larger like the other thumbnails, see WindowThumb
+            layer.textureSize: controller.overviewRoot.thumbTextureSize(width, height)
+            layer.smooth: true
             layer.effect: RoundedCorners {
                 radius: controller.overviewRoot.windowRadius
             }

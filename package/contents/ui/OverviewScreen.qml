@@ -17,6 +17,15 @@ Item {
     readonly property rect screenGeometry: targetScreen.geometry
     readonly property real rowHeight: Math.round(height * overview.config.RowHeight / 100)
     readonly property real thumbScale: screenGeometry.height > 0 ? rowHeight / screenGeometry.height : 1
+    // how much larger than shown the thumbnails are rendered, up to the window's real size, at most twice: shrinking
+    // to half with linear filtering averages each 2x2 pixels, sharp and without taking too much memory
+    readonly property real thumbSupersampling: Math.max(1, Math.min(2, 1 / thumbScale))
+    // the texture of a window's layer when it's shown at the given size, the same while zooming, which would
+    // otherwise allocate a new one every frame
+    function thumbTextureSize(width, height) {
+        const scale = thumbSupersampling * Screen.devicePixelRatio;
+        return Qt.size(Math.ceil(width * scale), Math.ceil(height * scale));
+    }
     readonly property bool multipleScreens: KWinComponents.Workspace.screens.length > 1
     readonly property DesktopRow currentRow: rows.currentItem as DesktopRow
 
