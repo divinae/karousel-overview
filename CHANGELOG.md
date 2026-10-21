@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6
+- Dropping a window onto another one: onto its middle stacks them in Karousel's stacked layout, onto its top or bottom puts it above or below in a column whose windows are one under another, onto its left or right quarter gives it a column of its own there; whatever Karousel's "Stack columns by default" is
+- The part of the window it drops onto is highlighted, and the bars showing where it lands are thicker
+- A button on a hovered window makes it float, or tiles it again
+- Columns with several windows have a grip on top: dragging it moves the whole column, shown as it is, between columns, onto another window like a single window would go, or to the end of another desktop (Karousel's "Move column to desktop", for the first twelve desktops)
+- A "Stack"/"Unstack" button in a column's corner switches between Karousel's stacked layout and the windows one under another
+- A floating window dropped where it would be tiled gets tiled there
+- A window from a shared column, stacked or not, dropped between columns or on free space gets a column of its own there
+- Dragging a window to another desktop: holding it over that desktop makes it current, then it can be put at any place there like on its own desktop
+- Columns are recognised also when stacked, whose windows are offset from each other, and with apps like terminals that round their size to their character cells
+- Dragging something from an app, e.g. a file: open the overview with its screen corner or shortcut, hold it over a window to switch to that window and drop it there, or over a desktop on the minimap to show that desktop
+
 ## 0.5.1
 - Small text in the window thumbnails, also the dragged one, stays whole instead of jagged, they are rendered twice as large and scaled down
 
