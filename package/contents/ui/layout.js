@@ -46,9 +46,9 @@ function stripBounds(screen, geometries) {
     return { minX: minX, maxX: maxX };
 }
 
-// groups windows into Karousel columns, sorted from left to right: windows of about the same width that mostly overlap
-// horizontally, tiled ones share x, stacked ones are offset a little from each other, and apps like terminals round
-// their size to their character cells; separate columns never overlap, a narrower dialog over a column isn't in it;
+// groups windows into Karousel columns, sorted from left to right: windows lined up the way Karousel lines them up,
+// tiled ones one under another at the same x, stacked ones each offset a little from the one before, of about the same
+// width, apps like terminals round their size to their character cells; a floating window over a column isn't in it;
 // entries are {window, geometry}, columns are {x, y, width, bottom, windows}, each one's windows from top to bottom
 function computeColumns(entries) {
     const columns = [];
@@ -56,8 +56,13 @@ function computeColumns(entries) {
         const geometry = entry.geometry;
         const right = geometry.x + geometry.width;
         const column = columns.find(column => {
-            const overlap = Math.min(right, column.x + column.width) - Math.max(geometry.x, column.x);
-            return overlap >= 0.8 * Math.max(geometry.width, column.windowWidth);
+            const last = column.last;
+            const tolerance = Math.max(4, 0.04 * geometry.width);
+            if (Math.abs(geometry.x - last.x) > tolerance || Math.abs(geometry.width - last.width) > Math.max(16, 0.04 * geometry.width)) {
+                return false;
+            }
+            // below the one before, or over it only by the little a stacked column offsets its windows
+            return geometry.y >= last.y + last.height - 2 || geometry.y - last.y <= 0.1 * last.height;
         });
         if (column === undefined) {
             columns.push({
@@ -66,7 +71,7 @@ function computeColumns(entries) {
                 width: geometry.width,
                 bottom: geometry.y + geometry.height,
                 windows: [entry.window],
-                windowWidth: geometry.width,
+                last: geometry,
             });
         } else {
             const columnRight = Math.max(column.x + column.width, right);
@@ -75,10 +80,11 @@ function computeColumns(entries) {
             column.y = Math.min(column.y, geometry.y);
             column.bottom = Math.max(column.bottom, geometry.y + geometry.height);
             column.windows.push(entry.window);
+            column.last = geometry;
         }
     }
     for (const column of columns) {
-        delete column.windowWidth;
+        delete column.last;
     }
     return columns.sort((a, b) => a.x - b.x);
 }

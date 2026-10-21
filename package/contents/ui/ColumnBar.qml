@@ -33,12 +33,16 @@ Item {
         }
     }
 
-    // where to grab it, shown while the pointer is there
+    // what grabbing it moves: the whole column lights up, from the strip down to its last window, while the pointer is
+    // on the strip
     Rectangle {
-        anchors.fill: parent
-        anchors.bottomMargin: Kirigami.Units.smallSpacing
+        y: Kirigami.Units.smallSpacing
+        width: parent.width
+        height: columnBar.alive ? parent.height + (columnBar.modelData.bottom - columnBar.modelData.y) * columnBar.strip.thumbScale : 0
         radius: Kirigami.Units.cornerRadius
-        color: columnBar.alive ? columnBar.strip.style.highlightAlpha(0.2) : "transparent"
+        color: columnBar.alive ? columnBar.strip.style.highlightAlpha(0.12) : "transparent"
+        border.width: 2
+        border.color: Kirigami.Theme.highlightColor
         opacity: columnBar.lit ? 1 : 0
         visible: opacity > 0
 

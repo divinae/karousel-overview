@@ -57,6 +57,8 @@ Item {
     // the current desktop of this screen, kept up to date
     property var activeDesktop: currentDesktop()
     property string searchText: ""
+    // the whole search text is selected, by Ctrl+A: typing replaces it, Backspace and Delete clear it
+    property bool searchSelected: false
     // while searching, the keys go to the results instead of the windows: after Up or Tab from the windows, from the
     // start with the setting for apps first, or when no window on the current desktop matches; Down on the last result
     // goes back
@@ -377,7 +379,32 @@ Item {
         (searchOverlay.resultsView as ListView).currentIndex = 0;
     }
 
+    // keys while the search text is selected, false for those that only deselect it
+    function handleSelectedKey(event) {
+        switch (event.key) {
+        case Qt.Key_Backspace:
+        case Qt.Key_Delete:
+            searchText = "";
+            return true;
+        }
+        if (event.text.length === 1 && event.text >= " " && !(event.modifiers & (Qt.ControlModifier | Qt.MetaModifier | Qt.AltModifier))) {
+            searchText = event.text;
+            return true;
+        }
+        searchSelected = false;
+        return false;
+    }
+
     function handleKey(event) {
+        if (event.key === Qt.Key_A && (event.modifiers & Qt.ControlModifier)) {
+            searchSelected = searchText !== "";
+            event.accepted = true;
+            return;
+        }
+        if (searchSelected && handleSelectedKey(event)) {
+            event.accepted = true;
+            return;
+        }
         if (keysToResults && handleResultsKey(event)) {
             event.accepted = true;
             return;
@@ -656,6 +683,7 @@ Item {
         z: 3
         opacity: overview.zoom
         searchText: overview.searchText
+        textSelected: overview.searchSelected
         fieldAlwaysShown: overview.config.SearchFieldShown
         resultsHeight: overview.resultsHeight
         resultsFocused: overview.keysToResults
@@ -670,7 +698,10 @@ Item {
         resultsFocused = searching && !config.SearchWindowsFirst;
         Qt.callLater(rows.glideToRowsTop);
     }
-    onSearchTextChanged: Qt.callLater(refreshSelection)
+    onSearchTextChanged: {
+        searchSelected = false;
+        Qt.callLater(refreshSelection);
+    }
 
     // the selection follows focus changes from outside the overview, e.g. Karousel's key bindings
     Connections {

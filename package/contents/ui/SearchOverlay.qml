@@ -14,6 +14,8 @@ Item {
     id: overlay
 
     required property string searchText
+    // the whole text is selected, see OverviewScreen.searchSelected
+    required property bool textSelected
     // also before typing starts, otherwise it shows with the search
     required property bool fieldAlwaysShown
     // how tall the results may get, the matching windows are below that
@@ -150,9 +152,19 @@ Item {
                         width: Math.min(implicitWidth, panel.width - extra)
                         elide: Text.ElideLeft
                         text: overlay.searchText !== "" ? overlay.searchText : I18n.tr("Type to search")
-                        color: Kirigami.Theme.textColor
+                        color: overlay.textSelected ? Kirigami.Theme.highlightedTextColor : Kirigami.Theme.textColor
                         opacity: overlay.searchText !== "" ? 1 : 0.5
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.1
+
+                        // selected, like in a text field
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: -1
+                            z: -1
+                            radius: 2
+                            color: Kirigami.Theme.highlightColor
+                            visible: overlay.textSelected
+                        }
                     }
 
                     // a caret, so that it reads as the place where typing goes; blinking by a timer, an animation would

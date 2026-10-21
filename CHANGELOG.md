@@ -1,12 +1,13 @@
 # Changelog
 
 ## 0.8
-- A search field at the top, "Type to search": typing still goes there right away, ✕ clears it
+- A search field at the top, "Type to search": typing still goes there right away, ✕ clears it, Ctrl+A selects the text, so that typing replaces it and Backspace or Delete clears it
 - While searching, a card with KRunner's results, apps and more, shows right below the field, and the current desktop's matching windows below it; Up or Tab goes from the windows into the results, Down from the last one back, the other desktops fade
 - The search field grows into a see-through, blurred panel with the results while searching
 - Settings for the search: "Search field always shown", otherwise it shows once typing starts; "Search windows too", otherwise it only looks for apps and more, like KRunner; "Windows first, then apps", whether typing goes to the windows or to the apps first
 - Hovering a window no longer starts the mode for things dragged from apps, which showed the minimap and closed the overview on that window
-- A column is grabbed by the whole strip above it, which lights up on hover, not only by the pill in its middle; a window grabbed by its title bar right below no longer takes the drag from the grip
+- A column is grabbed by the whole strip above it, not only by the pill in its middle, and the whole column lights up on hover, so that it's clear what moves; a window grabbed by its title bar right below no longer takes the drag from the grip
+- A floating window over a column is no longer taken for one of its windows, which also kept it from being dragged
 
 ## 0.7
 - Translations: the overview and its settings can be translated, Polish is the first, see "Translating" in the README

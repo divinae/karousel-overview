@@ -298,15 +298,15 @@ test("placeAtEnd puts a column after the others and as tall, or in the middle of
         { x: 1726, y: 6, height: 1068 });
 });
 
-test("computeColumns joins windows overlapping by at least 80% of the wider one", () => {
-    const join = Layout.computeColumns([
-        { window: "a", geometry: rect(0, 0, 1000, 500) },
-        { window: "b", geometry: rect(200, 510, 1000, 500) },
+test("computeColumns keeps a floating window of the same width over a column out of it", () => {
+    const columns = Layout.computeColumns([
+        { window: "a", geometry: rect(0, 6, 1000, 700) },
+        { window: "b", geometry: rect(0, 716, 1000, 700) },
+        // floating, a bit to the side, over both
+        { window: "floating", geometry: rect(150, 300, 1000, 540) },
+        // floating, lined up with the column, but over it much more than a stacked column offsets its windows
+        { window: "aligned", geometry: rect(2, 400, 1000, 540) },
     ]);
-    assert.equal(join.length, 1);
-    const apart = Layout.computeColumns([
-        { window: "a", geometry: rect(0, 0, 1000, 500) },
-        { window: "b", geometry: rect(201, 510, 1000, 500) },
-    ]);
-    assert.equal(apart.length, 2);
+    assert.deepEqual(plain(columns.find(column => column.windows.includes("a")).windows), ["a", "b"]);
+    assert.equal(columns.length, 3);
 });

@@ -196,16 +196,16 @@ msgid ""
 "System Settings, under Screen Edges."
 msgstr ""
 
-#: package/contents/ui/ColumnBar.qml:98
+#: package/contents/ui/ColumnBar.qml:102
 msgid "Move column"
 msgstr ""
 
-#: package/contents/ui/ColumnBar.qml:170
+#: package/contents/ui/ColumnBar.qml:174
 msgctxt "@action:button the windows of a column"
 msgid "Stack"
 msgstr ""
 
-#: package/contents/ui/ColumnBar.qml:170
+#: package/contents/ui/ColumnBar.qml:174
 msgctxt "@action:button the windows of a column"
 msgid "Unstack"
 msgstr ""
@@ -281,15 +281,15 @@ msgstr ""
 msgid "Own column here"
 msgstr ""
 
-#: package/contents/ui/SearchOverlay.qml:79
+#: package/contents/ui/SearchOverlay.qml:81
 msgid "Search"
 msgstr ""
 
-#: package/contents/ui/SearchOverlay.qml:152
+#: package/contents/ui/SearchOverlay.qml:154
 msgid "Type to search"
 msgstr ""
 
-#: package/contents/ui/SearchOverlay.qml:190
+#: package/contents/ui/SearchOverlay.qml:202
 msgctxt "@action:button the search"
 msgid "Clear"
 msgstr ""
