@@ -40,11 +40,10 @@ Item {
     property string dropAction: ""
     // the row showing a hint of what dropping does
     property DesktopRow hintRow: null
-    // center of the dragged thumbnail, where it gets dropped
-    readonly property real centerX: window !== null ? position.x - offset.x + window.frameGeometry.width * overviewRoot.thumbScale / 2 : 0
 
     // minimapIndex is the minimap's card it's dropped on, -1 between its cards, -2 when not over the minimap
-    signal dropped(QtObject window, point position, real centerX, QtObject targetWindow, QtObject tileWindow, int side, bool stacked, bool wholeColumn, int minimapIndex)
+    // dropX is the pointer's, where the column goes among the others
+    signal dropped(QtObject window, point position, real dropX, QtObject targetWindow, QtObject tileWindow, int side, bool stacked, bool wholeColumn, int minimapIndex)
 
     function start(window, item, scenePosition, columnWindows) {
         controller.columnWindows = columnWindows;

@@ -120,16 +120,21 @@ Item {
     function goToRow(index) {
         navigatedAt = Date.now();
         const desktops = KWinComponents.Workspace.desktops;
+        const show = () => {
+            rows.currentIndex = Layout.clamp(index, 0, rows.count - 1);
+            overview.currentRow?.selectClosestToViewport(false);
+        };
         if (index === desktops.length) {
             const last = desktops[desktops.length - 1];
             if (KWinComponents.Workspace.windows.some(window => window.desktops.length === 1 && window.desktops[0] === last)) {
                 createDesktop();
-            } else {
-                index = desktops.length - 1;
+                // after the rows keep showing the row they showed when the count changed, see onCountChanged
+                Qt.callLater(show);
+                return;
             }
+            index = desktops.length - 1;
         }
-        rows.currentIndex = Layout.clamp(index, 0, rows.count - 1);
-        overview.currentRow?.selectClosestToViewport(false);
+        show();
     }
 
     // the minimap's card at a point, the last one is for a new desktop, -1 when there's none
@@ -358,12 +363,18 @@ Item {
         if (!checkLayout) {
             return;
         }
-        // a column that gets a second window has Karousel's default layout, which can't be read, so check it
-        layoutCheck = { window: window, targetWindow: targetWindow, row: row, stacked: stacked, signature: "", ticks: 0 };
-        layoutTimer.restart();
+        // a column that gets a second window has Karousel's default layout, which can't be read, so check it once
+        // Karousel has laid it out, and switch it if it isn't the wanted one
+        const joined = () => row.karouselColumns().find(column => column.windows.includes(window) && column.windows.includes(targetWindow));
+        waitThen(row, () => joined() !== undefined, () => {
+            const column = joined();
+            if (column !== undefined && row.isStackedColumn(column) !== stacked) {
+                focusWindow(window);
+                invokeKarousel([Layout.KarouselShortcuts.columnToggleStacked]);
+            }
+        });
     }
 
-    property var layoutCheck: null
 
     // between Karousel's stacked layout for the window's column and its windows one under another
     function toggleStacked(window) {
@@ -405,7 +416,8 @@ Item {
             overview.waitChecks = [];
             const done = [];
             for (const check of checks) {
-                if (++check.ticks > 15) {
+                // Karousel's key bindings go through D-Bus, give it a few seconds
+                if (++check.ticks > 40) {
                     continue;
                 }
                 if (!check.ready()) {
@@ -413,7 +425,7 @@ Item {
                     continue;
                 }
                 // the same for two checks in a row, when Karousel is done
-                const signature = JSON.stringify(check.row.karouselColumns().map(column => [column.x, column.width]));
+                const signature = JSON.stringify(check.row.karouselColumns().map(column => [column.x, column.width, column.y, column.bottom, column.windows.length]));
                 if (signature !== check.signature) {
                     check.signature = signature;
                     overview.waitChecks.push(check);
@@ -443,37 +455,6 @@ Item {
         focusWindow(window);
         invokeKarousel([Layout.KarouselShortcuts.windowToggleFloating]);
         selectedWindow = window;
-    }
-
-    // once Karousel has laid out the column the dropped window joined, switches its layout if it isn't the wanted one
-    Timer {
-        id: layoutTimer
-        interval: 150
-        repeat: true
-        onTriggered: {
-            const check = overview.layoutCheck;
-            if (check === null || ++check.ticks > 12) {
-                stop();
-                overview.layoutCheck = null;
-                return;
-            }
-            const column = check.row.karouselColumns().find(column => column.windows.includes(check.window) && column.windows.includes(check.targetWindow));
-            if (column === undefined) {
-                return;
-            }
-            // the same for two checks in a row, when Karousel is done
-            const signature = JSON.stringify(column.windows.map(window => overview.geometryOf(window)));
-            if (signature !== check.signature) {
-                check.signature = signature;
-                return;
-            }
-            if (check.row.isStackedColumn(column) !== check.stacked) {
-                overview.focusWindow(check.window);
-                overview.invokeKarousel([Layout.KarouselShortcuts.columnToggleStacked]);
-            }
-            stop();
-            overview.layoutCheck = null;
-        }
     }
 
     // a whole column, its windows given from top to bottom, dropped onto a window: they join that window's column one
@@ -580,7 +561,7 @@ Item {
         dragController.cancel();
     }
 
-    function dropWindow(window, position, centerX, targetWindow, tileWith, side, stacked, wholeColumn, minimapIndex) {
+    function dropWindow(window, position, dropX, targetWindow, tileWith, side, stacked, wholeColumn, minimapIndex) {
         // a whole column dragged by its grip moves with Karousel's key bindings
         const move = (desktop) => {
             if (wholeColumn) {
@@ -607,7 +588,7 @@ Item {
             } else if (tileWith !== null && row.hasWindow(tileWith)) {
                 tileColumn(window, tileWith, side, row);
             } else {
-                row.reorderColumn(window, centerX, true);
+                row.reorderColumn(window, dropX, true);
             }
             return;
         }
@@ -620,7 +601,7 @@ Item {
             return;
         }
         if (!wholeColumn && row !== null && row.placesWindow(window)) {
-            row.reorderColumn(window, centerX, false);
+            row.reorderColumn(window, dropX, false);
             return;
         }
 
@@ -658,13 +639,13 @@ Item {
             const otherGeometry = geometryOf(other);
             return otherGeometry.x + otherGeometry.width;
         }));
-        const left = Math.min(...windows.map(window => window.frameGeometry.x));
-        const width = Math.max(...windows.map(window => window.frameGeometry.x + window.frameGeometry.width)) - left;
+        const left = Math.min(...windows.map(window => geometryOf(window).x));
+        const width = Math.max(...windows.map(window => geometryOf(window).x + geometryOf(window).width)) - left;
         const area = KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, targetScreen, desktop);
         const x = others.length > 0 ? right + horizontalGap : area.x + (area.width - width) / 2;
         // where it shows on that desktop until Karousel lays it out, see moveWindowToDesktop
         for (const window of windows) {
-            const geometry = window.frameGeometry;
+            const geometry = geometryOf(window);
             overview.sceneEffect.layouts[window.internalId.toString()] = {
                 geometry: Qt.rect(x + geometry.x - left, geometry.y, geometry.width, geometry.height),
                 desktop: desktop.id,
@@ -679,7 +660,8 @@ Item {
     // end of the desktop's strip once that desktop is current, or puts it in the middle of an empty one, so it's shown
     // there until then, see main.qml's layouts
     function moveWindowToDesktop(window, desktop) {
-        const geometry = window.frameGeometry;
+        // where Karousel put it, its desktop may not be the current one
+        const geometry = geometryOf(window);
         const others = KWinComponents.Workspace.windows.filter(other => other !== window && other.normalWindow
             && !other.minimized && other.desktops.length === 1 && other.desktops[0] === desktop);
         const right = Math.max(...others.map(other => {
@@ -883,7 +865,7 @@ Item {
         anchors.fill: parent
         z: 1
         overviewRoot: overview // qmllint disable incompatible-type
-        onDropped: (window, position, centerX, targetWindow, tileWindow, side, stacked, wholeColumn, minimapIndex) => overview.dropWindow(window, position, centerX, targetWindow, tileWindow, side, stacked, wholeColumn, minimapIndex)
+        onDropped: (window, position, dropX, targetWindow, tileWindow, side, stacked, wholeColumn, minimapIndex) => overview.dropWindow(window, position, dropX, targetWindow, tileWindow, side, stacked, wholeColumn, minimapIndex)
     }
 
     // shows where dropping a window between two rows creates a new desktop, styled like the column insertion hint

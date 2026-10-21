@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1
+- The minimap's card for a new desktop shows that desktop's row, instead of going back to the one shown before
+- Letting go of the current desktop's row after panning it scrolls Karousel by its own columns, floating windows and the search don't throw it off
+- A desktop's remove button only shows when it has no windows in any activity
+- Two drops right after each other both get the column layout they asked for, and Karousel gets more time to place a window before it's moved on
+- A window or column moved from a desktop that isn't current shows on the other one where Karousel had it
+
 ## 0.6
 - Dropping a window onto another one: onto its middle stacks them in Karousel's stacked layout, onto its top or bottom puts it above or below in a column whose windows are one under another, onto its left or right quarter gives it a column of its own there; whatever Karousel's "Stack columns by default" is
 - The part of the window it drops onto is highlighted, and the bars showing where it lands are thicker

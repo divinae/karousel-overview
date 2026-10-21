@@ -344,6 +344,12 @@ Item {
         return Layout.isStacked(column.windows.map(window => overviewRoot.geometryOf(window)));
     }
 
+    // whether the desktop has no windows of its own, in any activity; windows on all desktops don't count, removing it
+    // would move the others elsewhere
+    function isEmpty() {
+        return !KWinComponents.Workspace.windows.some(window => window.normalWindow && window.desktops.length === 1 && window.desktops[0] === desktop);
+    }
+
     // whether a window is in a column with other windows
     function sharesColumn(window) {
         return karouselColumns().some(column => column.windows.length > 1 && column.windows.includes(window));
@@ -474,7 +480,13 @@ Item {
     // scrolls Karousel's real view by whole columns, so that the column at the wallpaper's left edge in the preview
     // is at the screen's left edge, then puts the view back on the wallpaper, where the windows now are
     function syncKarouselScroll() {
-        const lefts = columns.map(column => toStripX(column.x));
+        // Karousel's own columns, which its scroll key bindings count, not the floating windows, and also those the
+        // search hides
+        const lefts = karouselColumns().map(column => toStripX(column.x));
+        if (lefts.length === 0) {
+            glideToViewport();
+            return;
+        }
         const closest = x => lefts.reduce((best, left, i) => Math.abs(left - x) < Math.abs(lefts[best] - x) ? i : best, 0);
         const steps = closest(viewportFrame.x) - closest(flick.contentX + viewportLeft);
         if (steps === 0) {
@@ -1318,7 +1330,8 @@ Item {
                 radius: width / 2
                 color: removeHover.hovered ? "#da4453" : Qt.rgba(1, 1, 1, 0.2)
                 // the window count is filtered by the search, so don't offer removing while searching
-                visible: headerHover.hovered && !row.editingName && row.desktop !== null && row.windowCount === 0
+                // windowCount only to be checked again as windows come and go
+                visible: headerHover.hovered && !row.editingName && row.desktop !== null && row.windowCount >= 0 && row.isEmpty()
                          && row.overviewRoot.searchText === "" && KWinComponents.Workspace.desktops.length > 1
 
                 Text {
