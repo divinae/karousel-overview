@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7
+- Translations: the overview and its settings can be translated, Polish is the first, see "Translating" in the README
+- Dragging is lighter: what's under a dragged window is worked out once, and not at all while the pointer holds still
+- A window moved back from another desktop and dropped beside a window gets its own column, it was taken for a floating one
+- Activities: the overview takes only the current activity's windows into account everywhere, keeps Karousel's layout for each activity, and follows a switch to another activity while it's open
+- Drop zones and placement rules are covered by tests, the big QML files are split into smaller ones
+
 ## 0.6.1
 - The minimap's card for a new desktop shows that desktop's row, instead of going back to the one shown before
 - Letting go of the current desktop's row after panning it scrolls Karousel by its own columns, floating windows and the search don't throw it off
