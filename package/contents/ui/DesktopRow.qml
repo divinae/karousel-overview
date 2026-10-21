@@ -124,7 +124,8 @@ Item {
         stripMaxX = bounds.maxX;
         const newColumns = Layout.computeColumns(entries);
         // reassigning rebuilds the column frames, only do it when they changed
-        const signature = column => [column.x, column.y, column.width, column.bottom, column.windows.length].join(":");
+        // also which windows, in which order, the grips drag them
+        const signature = column => [column.x, column.y, column.width, column.bottom, column.windows.map(window => window.internalId).join(",")].join(":");
         if (newColumns.map(signature).join("|") !== columns.map(signature).join("|")) {
             columns = newColumns;
         }
@@ -153,10 +154,41 @@ Item {
         }
     }
 
-    // Karousel's columns on this desktop, from all of its windows, also those hidden by the search,
-    // so that the indexes match Karousel's when driving it through its key bindings
+    // Karousel's columns on this desktop, from all of its windows, also those hidden by the search, without the
+    // floating ones, so that the indexes match Karousel's when driving it through its key bindings
     function karouselColumns() {
-        return Layout.computeColumns(karouselWindows().map(window => ({ window: window, geometry: overviewRoot.geometryOf(window) })));
+        if (desktop === null) {
+            return [];
+        }
+        const area = KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, overviewRoot.targetScreen, desktop);
+        return Layout.computeColumns(karouselWindows().map(window => ({ window: window, geometry: overviewRoot.geometryOf(window) })))
+            .filter(column => isTiledColumn(column, area));
+    }
+
+    // whether Karousel tiles a column, which then starts at the top of the desktop's area and reaches its bottom, or at
+    // least more than half of its height for windows that can't be as tall; it limits windows to half of that height
+    // when they start floating
+    function isTiledColumn(column, area) {
+        const tolerance = Kirigami.Units.gridUnit * 4;
+        return column.y <= area.y + tolerance
+            && (column.bottom >= area.y + area.height - tolerance || column.bottom - column.y > area.height * 0.55);
+    }
+
+    // a window dropped here can be put at a place among the columns: it's on this desktop, or this desktop is the current
+    // one, which Karousel lays out, a window from another one is moved here first
+    function placesWindow(window) {
+        return hasWindow(window) || (desktop !== null && desktop === overviewRoot.activeDesktop);
+    }
+
+    // a window that isn't in a column here, but gets one when dropped here: it floats, or it's on another desktop and
+    // this one is current
+    function arrives(window) {
+        return isFloating(window) || (!hasWindow(window) && placesWindow(window));
+    }
+
+    // a window on this desktop that Karousel doesn't tile
+    function isFloating(window) {
+        return karouselWindows().includes(window) && !karouselColumns().some(column => column.windows.includes(window));
     }
 
     function karouselWindows() {
@@ -227,31 +259,57 @@ Item {
 
     // where the column of a window dropped at overviewX goes, among Karousel's columns,
     // or null if the window isn't in this row
-    function columnDrop(window, overviewX) {
+    // a window that shares its column, dragged without it, leaves it for a column of its own at that place, among all the
+    // columns, its old one too; with wholeColumn, or alone in it, the column moves
+    function columnDrop(window, overviewX, wholeColumn) {
         const allColumns = karouselColumns();
+        // -1 for a floating window or one from another desktop, which gets tiled there
         const source = allColumns.findIndex(column => column.windows.includes(window));
-        if (source === -1) {
+        if (source === -1 && !arrives(window)) {
             return null;
         }
         const dropX = flick.contentItem.mapFromItem(overviewRoot, overviewX, 0).x;
-        const target = Layout.reorderTarget(allColumns.map(column => toStripX(column.x + column.width / 2)), source, dropX);
-        return { columns: allColumns, source: source, target: target };
+        const centers = allColumns.map(column => toStripX(column.x + column.width / 2));
+        if (source !== -1 && allColumns[source].windows.length > 1 && !wholeColumn) {
+            const target = Layout.reorderTarget(centers, -1, dropX);
+            return { columns: allColumns, source: source, target: target, expel: Layout.expelMoves(source, target) };
+        }
+        return { columns: allColumns, source: source, target: Layout.reorderTarget(centers, source, dropX), expel: null };
     }
 
-    function reorderColumn(window, overviewX) {
+    function reorderColumn(window, overviewX, wholeColumn) {
         hideInsertHint();
-        const drop = columnDrop(window, overviewX);
-        if (drop !== null && drop.target !== drop.source) {
+        const drop = columnDrop(window, overviewX, wholeColumn);
+        if (drop === null) {
+            return;
+        }
+        if (drop.expel !== null) {
+            overviewRoot.moveWindow(window, drop.expel);
+        } else if (drop.source === -1) {
+            // tiled next to the last focused column first, then moved among the others
+            const target = drop.target;
+            overviewRoot.bringThen(window, row, () => {
+                const source = karouselColumns().findIndex(column => column.windows.includes(window));
+                if (source !== -1 && target !== source) {
+                    overviewRoot.moveColumn(window, target - source);
+                }
+            });
+        } else if (drop.target !== drop.source) {
             overviewRoot.moveColumn(window, drop.target - drop.source);
         }
     }
 
-    function showInsertHint(window, overviewX) {
+    function showInsertHint(window, overviewX, wholeColumn) {
         stackHint = null;
         moveHint = false;
-        const drop = columnDrop(window, overviewX);
-        if (drop === null || drop.target === drop.source) {
+        const drop = columnDrop(window, overviewX, wholeColumn);
+        if (drop === null || (drop.expel === null && drop.target === drop.source)) {
             hideInsertHint();
+            return;
+        }
+        if (drop.expel !== null) {
+            const edges = drop.columns.map(column => ({ left: toStripX(column.x), right: toStripX(column.x + column.width) }));
+            insertHintX = Layout.insertHintX(edges, drop.target) ?? NaN;
             return;
         }
         const otherColumns = drop.columns.filter((column, i) => i !== drop.source)
@@ -259,20 +317,94 @@ Item {
         insertHintX = Layout.insertHintX(otherColumns, drop.target) ?? NaN;
     }
 
+    // shows where the window's own column goes beside another window's column, false when it's already there
+    // with wholeColumn, the window's whole column goes there
+    function showTileHint(window, tileWindow, side, wholeColumn) {
+        stackHint = null;
+        moveHint = false;
+        const columns = karouselColumns();
+        const source = columns.findIndex(column => column.windows.includes(window));
+        const target = columns.findIndex(column => column.windows.includes(tileWindow));
+        const floating = source === -1 && arrives(window);
+        if (target === -1 || (!floating && (source === -1 || Layout.tileMoves(columns.map((column, i) => wholeColumn && i === source ? 1 : column.windows.length), source, target, side).length === 0))) {
+            hideInsertHint();
+            return false;
+        }
+        const edges = columns.map(column => ({ left: toStripX(column.x), right: toStripX(column.x + column.width) }));
+        insertHintX = Layout.insertHintX(edges, side < 0 ? target : target + 1) ?? NaN;
+        return true;
+    }
+
     function hideInsertHint() {
         insertHintX = NaN;
     }
 
-    function showStackHint(window) {
+    // whether a column with several windows is in Karousel's stacked layout
+    function isStackedColumn(column) {
+        return Layout.isStacked(column.windows.map(window => overviewRoot.geometryOf(window)));
+    }
+
+    // whether a window is in a column with other windows
+    function sharesColumn(window) {
+        return karouselColumns().some(column => column.windows.length > 1 && column.windows.includes(window));
+    }
+
+    // whether a window dropped onto targetWindow can be stacked with it: Karousel stacks whole columns, so only when it's
+    // alone in its column or that column is stacked already
+    function canStackWith(targetWindow) {
+        const column = karouselColumns().find(column => column.windows.includes(targetWindow));
+        return column !== undefined && (column.windows.length === 1 || isStackedColumn(column));
+    }
+
+    // what dropping a window onto targetWindow does: the Karousel moves that put it right above (side -1) or below
+    // targetWindow in its column, and that column, which ends up stacked or not; null when it's already like that
+    function stackPlan(window, targetWindow, side, stacked) {
+        const columns = karouselColumns();
+        const source = columns.findIndex(column => column.windows.includes(window));
+        const target = columns.findIndex(column => column.windows.includes(targetWindow));
+        if (target === -1 || (source === -1 && !arrives(window))) {
+            return null;
+        }
+        const column = columns[target];
+        const index = column.windows.indexOf(targetWindow);
+        // a floating window or one from another desktop gets tiled first, the moves come after that
+        if (source === -1) {
+            return { moves: null, column: column, index: index };
+        }
+        const moves = Layout.stackBesideMoves(columns.map(column => column.windows.length), source, columns[source].windows.indexOf(window),
+                                              target, index, side);
+        if (moves.length === 0 && isStackedColumn(column) === stacked) {
+            return null;
+        }
+        return { moves: moves, column: column, index: index };
+    }
+
+    // shows the column the window would join and, unless it gets stacked, where in it; false when there's nothing to do
+    function showStackHint(window, targetWindow, side, stacked) {
         hideInsertHint();
         moveHint = false;
-        const column = karouselColumns().find(column => column.windows.includes(window));
-        stackHint = column === undefined ? null : {
+        const plan = stackPlan(window, targetWindow, side, stacked);
+        if (plan === null) {
+            stackHint = null;
+            return false;
+        }
+        const column = plan.column;
+        // between the target and its neighbour on that side, or at the column's end
+        const geometry = overviewRoot.geometryOf(targetWindow);
+        const neighbour = column.windows[plan.index + side];
+        let lineY = side < 0 ? geometry.y : geometry.y + geometry.height;
+        if (neighbour !== undefined && neighbour !== window) {
+            const other = overviewRoot.geometryOf(neighbour);
+            lineY = side < 0 ? (other.y + other.height + geometry.y) / 2 : (geometry.y + geometry.height + other.y) / 2;
+        }
+        stackHint = {
             x: toStripX(column.x),
             y: (column.y - screenGeometry.y) * thumbScale,
             width: column.width * thumbScale,
             height: (column.bottom - column.y) * thumbScale,
+            lineY: stacked ? NaN : (lineY - screenGeometry.y) * thumbScale,
         };
+        return true;
     }
 
     function showMoveHint() {
@@ -737,12 +869,16 @@ Item {
     Flickable {
         id: flick
         anchors.fill: parent
+        // reaches a little above the row, where the columns' grips stick out: a Flickable doesn't pass on events outside
+        // of itself; the margin keeps the content where it was, at the only position the bounds allow
+        anchors.topMargin: -Kirigami.Units.gridUnit
+        topMargin: Kirigami.Units.gridUnit
         // not clipped, so that the wallpaper's shadow shows above and below the row
         flickableDirection: Flickable.HorizontalFlick
         boundsBehavior: Flickable.StopAtBounds
         interactive: row.overviewRoot.draggedWindow === null
         contentWidth: Math.max((row.stripMaxX - row.stripMinX) * row.thumbScale + 2 * row.padding, row.minimizedEnd + row.padding)
-        contentHeight: height
+        contentHeight: row.height
         leftMargin: row.viewportLeft
         rightMargin: row.viewportLeft
 
@@ -785,6 +921,153 @@ Item {
             }
         }
 
+        // above each column with more than one window: a handle to drag the whole column by, and a button between
+        // Karousel's stacked layout and the windows one under another
+        Repeater {
+            model: row.columns.filter(column => column.windows.length > 1)
+
+            Item {
+                id: columnBar
+
+                required property var modelData
+                readonly property bool dragged: row.overviewRoot.draggedWindows.some(window => modelData.windows.includes(window))
+                readonly property bool stacked: row.isStackedColumn(modelData)
+                readonly property bool lit: gripHover.hovered || gripDrag.active
+
+                x: row.toStripX(modelData.x)
+                // right above the column's frame
+                y: (modelData.y - row.screenGeometry.y) * row.thumbScale - Kirigami.Units.smallSpacing - height
+                z: 100000
+                width: modelData.width * row.thumbScale
+                height: Kirigami.Units.gridUnit * 1.5
+                opacity: (row.overviewRoot.draggedWindow === null || dragged ? 1 : 0) * row.overviewRoot.zoom
+                visible: opacity > 0
+
+                // Karousel rearranging recreates them, the drag would never end without the DragHandler that tracks it
+                Component.onDestruction: {
+                    if (gripDrag.active) {
+                        row.overviewRoot.cancelDrag();
+                    }
+                }
+
+                // a pill with two rows of three dots, the usual sign for something to drag, on the frame's top edge,
+                // floating like the windows
+                Kirigami.ShadowedRectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.bottom
+                    // roomy around the dots, the whole pill grabs
+                    width: Kirigami.Units.gridUnit * 3.5
+                    height: Kirigami.Units.gridUnit * 1.4
+                    radius: height / 2
+                    color: columnBar.lit ? Kirigami.Theme.highlightColor : Kirigami.Theme.backgroundColor
+                    border.width: 1
+                    border.color: columnBar.lit ? Kirigami.Theme.highlightColor : row.style.foregroundAlpha(0.2)
+                    shadow.size: Kirigami.Units.gridUnit * (columnBar.lit ? 1 : 0.6)
+                    shadow.yOffset: Kirigami.Units.smallSpacing / 2
+                    shadow.color: columnBar.lit ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.6)
+                        : Qt.rgba(0, 0, 0, 0.3)
+
+                    Accessible.role: Accessible.Grip
+                    Accessible.name: "Move column"
+
+                    Behavior on color {
+                        ColorAnimation { duration: Kirigami.Units.shortDuration }
+                    }
+
+                    Grid {
+                        anchors.centerIn: parent
+                        rows: 2
+                        columns: 3
+                        spacing: Math.round(Kirigami.Units.smallSpacing * 0.75)
+
+                        Repeater {
+                            model: 6
+
+                            Rectangle {
+                                width: Math.round(Kirigami.Units.smallSpacing * 0.9)
+                                height: width
+                                radius: width / 2
+                                color: columnBar.lit ? Kirigami.Theme.highlightedTextColor : Kirigami.Theme.textColor
+                                opacity: columnBar.lit ? 1 : 0.55
+                            }
+                        }
+                    }
+
+                    HoverHandler {
+                        id: gripHover
+                        cursorShape: Qt.SizeAllCursor
+                    }
+
+                    DragHandler {
+                        id: gripDrag
+                        target: null
+                        // don't let the Flickables steal the drag
+                        grabPermissions: PointerHandler.CanTakeOverFromAnything
+                        onActiveChanged: {
+                            const windows = columnBar.modelData.windows;
+                            if (active) {
+                                row.overviewRoot.startDrag(windows[0], row.thumbForWindow(windows[0]), centroid.scenePressPosition, windows);
+                            } else {
+                                row.overviewRoot.endDrag();
+                            }
+                        }
+                        onCentroidChanged: {
+                            if (active) {
+                                row.overviewRoot.moveDrag(centroid.scenePosition);
+                            }
+                        }
+                    }
+                }
+
+                // stacked or one under another, with what clicking makes of it; in the column's top left corner,
+                // the windows' own buttons are on the right
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.top: parent.bottom
+                    anchors.margins: Kirigami.Units.smallSpacing * 2
+                    width: layoutLabel.implicitWidth + 2 * Kirigami.Units.largeSpacing
+                    height: Kirigami.Units.iconSizes.smallMedium + Kirigami.Units.smallSpacing
+                    radius: height / 2
+                    color: layoutHover.hovered ? Kirigami.Theme.highlightColor : Qt.rgba(0, 0, 0, 0.7)
+                    visible: row.overviewRoot.draggedWindow === null
+
+                    Accessible.role: Accessible.Button
+                    Accessible.name: layoutText.text
+
+                    Row {
+                        id: layoutLabel
+                        anchors.centerIn: parent
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Kirigami.Icon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Kirigami.Units.iconSizes.small
+                            height: width
+                            source: columnBar.stacked ? "view-split-top-bottom" : "window-duplicate"
+                            color: "white"
+                            isMask: true
+                        }
+
+                        Text {
+                            id: layoutText
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: columnBar.stacked ? "Unstack" : "Stack"
+                            color: "white"
+                        }
+                    }
+
+                    HoverHandler {
+                        id: layoutHover
+                    }
+
+                    TapHandler {
+                        gesturePolicy: TapHandler.WithinBounds
+                        onTapped: row.overviewRoot.toggleStacked(columnBar.modelData.windows[0])
+                    }
+                }
+            }
+        }
+
         // the column a dragged window would join
         Rectangle {
             x: row.stackHint !== null ? row.stackHint.x : 0
@@ -799,6 +1082,20 @@ Item {
             visible: row.stackHint !== null
         }
 
+        // where in that column, a glowing pill like the one between columns
+        Kirigami.ShadowedRectangle {
+            x: row.stackHint !== null ? row.stackHint.x + row.stackHint.width * 0.1 : 0
+            y: row.stackHint !== null && !isNaN(row.stackHint.lineY) ? row.stackHint.lineY - height / 2 : 0
+            z: 100000
+            width: row.stackHint !== null ? row.stackHint.width * 0.8 : 0
+            height: Kirigami.Units.smallSpacing * 2.5
+            radius: height / 2
+            color: Kirigami.Theme.highlightColor
+            shadow.size: Kirigami.Units.gridUnit * 1.5
+            shadow.color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.9)
+            visible: row.stackHint !== null && !isNaN(row.stackHint.lineY)
+        }
+
         // where a dragged column goes: a glowing pill that slides between the columns and fades in and out
         Kirigami.ShadowedRectangle {
             id: insertHint
@@ -810,12 +1107,12 @@ Item {
             x: hintX - width / 2
             y: row.height * 0.1
             z: 100000
-            width: Kirigami.Units.smallSpacing * 1.5
+            width: Kirigami.Units.smallSpacing * 2.5
             height: row.height * 0.8
             radius: width / 2
             color: Kirigami.Theme.highlightColor
-            shadow.size: Kirigami.Units.gridUnit
-            shadow.color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.6)
+            shadow.size: Kirigami.Units.gridUnit * 1.5
+            shadow.color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.9)
             opacity: shown ? 1 : 0
             visible: opacity > 0
 

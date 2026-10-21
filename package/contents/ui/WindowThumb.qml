@@ -41,7 +41,7 @@ Item {
     // minimized windows are shown after the strip instead, see DesktopRow
     visible: window.normalWindow && !window.minimized && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen)
     // a window that shows up while the view is synced has no place among the held thumbnails yet
-    opacity: strip.syncingScroll && isNaN(heldX) ? 0 : overviewRoot.draggedWindow === window ? 0.3 : 1
+    opacity: strip.syncingScroll && isNaN(heldX) ? 0 : overviewRoot.draggedWindows.includes(window) ? 0.3 : 1
 
     Accessible.role: Accessible.Button
     Accessible.name: window.caption
@@ -131,6 +131,22 @@ Item {
         }
     }
 
+    // the half of the window a dragged one drops onto, on the side where it goes, or its middle when they get stacked
+    Rectangle {
+        readonly property string zone: thumb.overviewRoot.dropZoneWindow === thumb.window ? thumb.overviewRoot.dropZone : ""
+        readonly property real inset: zone === "center" ? Math.min(parent.width, parent.height) * 0.15 : 0
+
+        x: zone === "right" ? parent.width / 2 : inset
+        y: zone === "bottom" ? parent.height / 2 : inset
+        width: zone === "left" || zone === "right" ? parent.width / 2 : parent.width - 2 * inset
+        height: zone === "top" || zone === "bottom" ? parent.height / 2 : parent.height - 2 * inset
+        radius: thumb.overviewRoot.windowRadius
+        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.4)
+        border.width: 2
+        border.color: Kirigami.Theme.highlightColor
+        visible: zone !== ""
+    }
+
     Rectangle {
         anchors.fill: parent
         anchors.margins: -3
@@ -186,6 +202,7 @@ Item {
     }
 
     Rectangle {
+        id: closeButton
         anchors.top: parent.top
         anchors.right: parent.right
         anchors.margins: Kirigami.Units.smallSpacing
@@ -194,6 +211,9 @@ Item {
         radius: width / 2
         color: closeHover.hovered ? "#da4453" : Qt.rgba(0, 0, 0, 0.7)
         visible: thumb.showControls && thumb.window.closeable
+
+        Accessible.role: Accessible.Button
+        Accessible.name: "Close"
 
         Text {
             anchors.centerIn: parent
@@ -209,6 +229,39 @@ Item {
             // takes the click for itself, so that the thumbnail's own handler doesn't activate the window too
             gesturePolicy: TapHandler.WithinBounds
             onTapped: thumb.window.closeWindow()
+        }
+    }
+
+    // left of the close button: Karousel stops tiling the window, or tiles it again
+    Rectangle {
+        anchors.top: parent.top
+        anchors.right: closeButton.visible ? closeButton.left : parent.right
+        anchors.margins: Kirigami.Units.smallSpacing
+        width: Kirigami.Units.iconSizes.smallMedium
+        height: width
+        radius: width / 2
+        color: floatHover.hovered ? Kirigami.Theme.highlightColor : Qt.rgba(0, 0, 0, 0.7)
+        visible: thumb.showControls && thumb.overviewRoot.karouselAvailable
+
+        Accessible.role: Accessible.Button
+        Accessible.name: "Toggle floating"
+
+        Kirigami.Icon {
+            anchors.centerIn: parent
+            width: Kirigami.Units.iconSizes.small
+            height: width
+            source: "window-restore"
+            color: "white"
+            isMask: true
+        }
+
+        HoverHandler {
+            id: floatHover
+        }
+
+        TapHandler {
+            gesturePolicy: TapHandler.WithinBounds
+            onTapped: thumb.overviewRoot.toggleFloating(thumb.window)
         }
     }
 

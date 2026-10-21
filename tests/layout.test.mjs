@@ -7,7 +7,7 @@ import vm from "node:vm";
 const source = readFileSync(new URL("../package/contents/ui/layout.js", import.meta.url), "utf8")
     .replace(/^\.pragma library$/m, "");
 const Layout = {};
-vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
+vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, stackBesideMoves, isStacked, expelMoves, tileMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
 
 const rect = (x, y, width, height) => ({ x, y, width, height });
 // objects from the vm context have that context's prototypes, which deepEqual tells apart
@@ -32,6 +32,35 @@ test("computeColumns groups windows sharing x and width, sorted from left to rig
     assert.deepEqual(plain(columns.map(column => column.windows)), [["a1", "a2"], ["b"], ["c"]]);
     assert.equal(columns[0].y, 0);
     assert.equal(columns[0].bottom, 1000);
+});
+
+test("computeColumns groups a stacked column, whose windows are offset from each other", () => {
+    const columns = Layout.computeColumns([
+        { window: "s2", geometry: rect(20, 30, 760, 970) },
+        { window: "s1", geometry: rect(0, 0, 760, 970) },
+        { window: "s3", geometry: rect(40, 60, 760, 970) },
+        { window: "b", geometry: rect(810, 0, 760, 1000) },
+    ]);
+    assert.deepEqual(plain(columns.map(column => column.windows)), [["s1", "s2", "s3"], ["b"]]);
+    assert.equal(columns[0].x, 0);
+    assert.equal(columns[0].width, 800);
+});
+
+test("computeColumns groups windows whose size is rounded to their character cells", () => {
+    const columns = Layout.computeColumns([
+        { window: "k1", geometry: rect(417, 6, 850, 700) },
+        { window: "k2", geometry: rect(417, 718, 843, 716) },
+        { window: "k3", geometry: rect(1275, 6, 890, 1428) },
+    ]);
+    assert.deepEqual(plain(columns.map(column => column.windows)), [["k1", "k2"], ["k3"]]);
+});
+
+test("computeColumns keeps a narrower window over a column out of it", () => {
+    const columns = Layout.computeColumns([
+        { window: "tiled", geometry: rect(0, 0, 800, 1000) },
+        { window: "dialog", geometry: rect(200, 300, 400, 300) },
+    ]);
+    assert.deepEqual(plain(columns.map(column => column.windows)), [["tiled"], ["dialog"]]);
 });
 
 test("computeColumns of an empty row is empty", () => {
@@ -171,4 +200,50 @@ test("innerGaps takes the most common gap, a window Karousel doesn't tile can be
     // columns 8 px apart, and a floating window 2 px after the last one
     const geometries = [rect(0, 0, 100, 500), rect(108, 0, 100, 500), rect(216, 0, 100, 500), rect(318, 100, 50, 50)];
     assert.equal(Layout.innerGaps(geometries).horizontal, 8);
+});
+
+test("tileMoves moves a window alone in its column next to the target", () => {
+    const S = Layout.KarouselShortcuts;
+    assert.deepEqual(plain(Layout.tileMoves([1, 1, 1], 0, 2, 1)), [S.columnMoveRight, S.columnMoveRight]);
+    assert.deepEqual(plain(Layout.tileMoves([1, 1, 1], 0, 2, -1)), [S.columnMoveRight]);
+    assert.deepEqual(plain(Layout.tileMoves([1, 1, 1], 2, 0, -1)), [S.columnMoveLeft, S.columnMoveLeft]);
+    // already there
+    assert.deepEqual(plain(Layout.tileMoves([1, 1], 0, 1, -1)), []);
+});
+
+test("tileMoves takes the window out of a shared column", () => {
+    const S = Layout.KarouselShortcuts;
+    assert.deepEqual(plain(Layout.tileMoves([2, 1], 0, 1, -1)), [S.windowMoveRight]);
+    assert.deepEqual(plain(Layout.tileMoves([1, 2], 1, 0, 1)), [S.windowMoveRight, S.columnMoveLeft]);
+    // beside the column it was in
+    assert.deepEqual(plain(Layout.tileMoves([3], 0, 0, 1)), [S.windowMoveRight]);
+    assert.deepEqual(plain(Layout.tileMoves([3], 0, 0, -1)), [S.windowMoveRight, S.columnMoveLeft]);
+});
+
+test("stackBesideMoves puts the window above or below the target in its column", () => {
+    const S = Layout.KarouselShortcuts;
+    // joins at the bottom, below the only window there already
+    assert.deepEqual(plain(Layout.stackBesideMoves([1, 1], 0, 0, 1, 0, 1)), [S.windowMoveRight]);
+    assert.deepEqual(plain(Layout.stackBesideMoves([1, 1], 0, 0, 1, 0, -1)), [S.windowMoveRight, S.windowMoveUp]);
+    assert.deepEqual(plain(Layout.stackBesideMoves([1, 3], 0, 0, 1, 1, -1)), [S.windowMoveRight, S.windowMoveUp, S.windowMoveUp]);
+    // within its own column
+    assert.deepEqual(plain(Layout.stackBesideMoves([3], 0, 0, 0, 2, 1)), [S.windowMoveDown, S.windowMoveDown]);
+    assert.deepEqual(plain(Layout.stackBesideMoves([3], 0, 2, 0, 1, -1)), [S.windowMoveUp]);
+    // already there
+    assert.deepEqual(plain(Layout.stackBesideMoves([3], 0, 0, 0, 1, -1)), []);
+});
+
+test("isStacked tells overlapping windows from ones one under another", () => {
+    assert.equal(Layout.isStacked([rect(0, 0, 800, 970), rect(8, 32, 800, 970)]), true);
+    assert.equal(Layout.isStacked([rect(0, 0, 800, 490), rect(0, 500, 800, 490)]), false);
+    assert.equal(Layout.isStacked([rect(0, 0, 800, 1000)]), false);
+});
+
+test("expelMoves takes the window out of its column to where it's dropped", () => {
+    const S = Layout.KarouselShortcuts;
+    // right after its old column, left of it, after the last one
+    assert.deepEqual(plain(Layout.expelMoves(0, 1)), [S.windowMoveRight]);
+    assert.deepEqual(plain(Layout.expelMoves(1, 1)), [S.windowMoveRight, S.columnMoveLeft]);
+    assert.deepEqual(plain(Layout.expelMoves(0, 3)), [S.windowMoveRight, S.columnMoveRight, S.columnMoveRight]);
+    assert.deepEqual(plain(Layout.expelMoves(1, 0)), [S.windowMoveRight, S.columnMoveLeft, S.columnMoveLeft]);
 });

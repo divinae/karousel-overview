@@ -29,6 +29,10 @@ Meta=org.kde.kglobalaccel,/component/kwin,org.kde.kglobalaccel.Component,invokeS
 [Effect-karousel_overview]
 BorderActivate=7
 CONFIG
+# KAROUSEL_CONFIG adds lines to Karousel's settings, e.g. KAROUSEL_CONFIG=stackColumnsByDefault=true
+if [ -n "${KAROUSEL_CONFIG:-}" ]; then
+    printf '\n[Script-karousel]\n%s\n' "$KAROUSEL_CONFIG" >> "$state/config/kwinrc"
+fi
 # the real session's KWin takes the shortcuts with Meta before the nested one gets them, so add one without it
 cat > "$state/config/kglobalshortcutsrc" <<'CONFIG'
 [kwin]

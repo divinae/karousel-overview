@@ -18,7 +18,7 @@ Item {
     // hidden until the dragged window comes close to where it would be
     // the pointer is at the edge it slides out from, see OverviewScreen
     property bool revealed: false
-    readonly property bool wanted: overviewRoot.config.MinimapAlwaysShown || drag.window !== null || revealed || panelHover.hovered
+    readonly property bool wanted: overviewRoot.config.MinimapAlwaysShown || drag.window !== null || overviewRoot.externalDrag || revealed || panelHover.hovered
     // stays a moment after the pointer leaves it, so that it doesn't hide while moving back to it
     property bool shown: false
     onWantedChanged: {
@@ -61,7 +61,8 @@ Item {
     readonly property real cardWidth: cardHeight * aspect
     readonly property real cardRadius: Kirigami.Units.smallSpacing * 1.5
     // where the dragged window would go
-    readonly property int dropIndex: drag.overMinimap && drag.dropAction !== "" ? drag.minimapIndex : -1
+    readonly property int dropIndex: drag.overMinimap && drag.dropAction !== "" ? drag.minimapIndex
+        : overviewRoot.externalDragCard
     // all windows, which each card filters for its desktop
     readonly property QtObject windowModel: KWinComponents.WindowModel {}
 

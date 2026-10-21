@@ -10,6 +10,15 @@ const KarouselShortcuts = {
     // a window alone in its column joins the neighbouring column, otherwise it leaves its column to that side
     windowMoveLeft: "karousel-window-move-left",
     windowMoveRight: "karousel-window-move-right",
+    // within its column
+    windowMoveUp: "karousel-window-move-up",
+    windowMoveDown: "karousel-window-move-down",
+    // between the windows of the focused column one under another and only one expanded at a time
+    columnToggleStacked: "karousel-column-toggle-stacked",
+    // the active window between tiled by Karousel and floating
+    windowToggleFloating: "karousel-window-toggle-floating",
+    // the focused column, kept together, to the end of desktop N, from 1 to 12, followed by the number
+    columnMoveToDesktop: "karousel-column-move-to-desktop-",
     // moves the view by one column, without changing focus
     scrollLeftColumn: "karousel-grid-scroll-left-column",
     scrollRightColumn: "karousel-grid-scroll-right-column",
@@ -37,29 +46,41 @@ function stripBounds(screen, geometries) {
     return { minX: minX, maxX: maxX };
 }
 
-// groups windows into Karousel columns, which share x and width, sorted from left to right;
-// entries are {window, geometry}, columns are {x, y, width, bottom, windows}
+// groups windows into Karousel columns, sorted from left to right: windows of about the same width that mostly overlap
+// horizontally, tiled ones share x, stacked ones are offset a little from each other, and apps like terminals round
+// their size to their character cells; separate columns never overlap, a narrower dialog over a column isn't in it;
+// entries are {window, geometry}, columns are {x, y, width, bottom, windows}, each one's windows from top to bottom
 function computeColumns(entries) {
-    const columnMap = new Map();
-    for (const entry of entries) {
+    const columns = [];
+    for (const entry of entries.slice().sort((a, b) => a.geometry.y - b.geometry.y)) {
         const geometry = entry.geometry;
-        const key = Math.round(geometry.x) + ":" + Math.round(geometry.width);
-        const column = columnMap.get(key);
+        const right = geometry.x + geometry.width;
+        const column = columns.find(column => {
+            const overlap = Math.min(right, column.x + column.width) - Math.max(geometry.x, column.x);
+            return overlap >= 0.8 * Math.max(geometry.width, column.windowWidth);
+        });
         if (column === undefined) {
-            columnMap.set(key, {
+            columns.push({
                 x: geometry.x,
                 y: geometry.y,
                 width: geometry.width,
                 bottom: geometry.y + geometry.height,
                 windows: [entry.window],
+                windowWidth: geometry.width,
             });
         } else {
+            const columnRight = Math.max(column.x + column.width, right);
+            column.x = Math.min(column.x, geometry.x);
+            column.width = columnRight - column.x;
             column.y = Math.min(column.y, geometry.y);
             column.bottom = Math.max(column.bottom, geometry.y + geometry.height);
             column.windows.push(entry.window);
         }
     }
-    return Array.from(columnMap.values()).sort((a, b) => a.x - b.x);
+    for (const column of columns) {
+        delete column.windowWidth;
+    }
+    return columns.sort((a, b) => a.x - b.x);
 }
 
 // the position in the column order where a column dropped at dropX lands,
@@ -115,6 +136,58 @@ function stackMoves(columnSizes, source, target) {
         moves.push(...repeat(KarouselShortcuts.columnMoveRight, targetPosition - position - 1));
         moves.push(KarouselShortcuts.windowMoveRight);
     }
+    return moves;
+}
+
+// whether a column's windows, given from top to bottom, are in Karousel's stacked layout, where they overlap
+function isStacked(geometries) {
+    for (let i = 1; i < geometries.length; i++) {
+        if (geometries[i].y < geometries[i - 1].y + geometries[i - 1].height - 1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Karousel shortcuts that move the focused window into the column of the target window, right above it for side -1 or
+// below it for side 1; source and target are the indexes of their columns, index and targetIndex their positions in them
+function stackBesideMoves(columnSizes, source, index, target, targetIndex, side) {
+    const moves = stackMoves(columnSizes, source, target);
+    // Karousel adds a window joining a column at its bottom
+    const position = source === target ? index : columnSizes[target];
+    const otherTarget = targetIndex > position ? targetIndex - 1 : targetIndex;
+    const final = side < 0 ? otherTarget : otherTarget + 1;
+    moves.push(...repeat(final < position ? KarouselShortcuts.windowMoveUp : KarouselShortcuts.windowMoveDown, Math.abs(final - position)));
+    return moves;
+}
+
+// Karousel shortcuts that take the focused window out of its shared column at index source into a column of its own,
+// which ends up where index target is among all the columns, its old one too
+function expelMoves(source, target) {
+    // a new column on its right first
+    const position = source + 1;
+    return [KarouselShortcuts.windowMoveRight,
+        ...repeat(target < position ? KarouselShortcuts.columnMoveLeft : KarouselShortcuts.columnMoveRight, Math.abs(target - position))];
+}
+
+// Karousel shortcuts that move the focused window from the column at index source into a column of its own right next
+// to the column at index target, on its left for side -1, on its right for side 1; columnSizes as for stackMoves
+function tileMoves(columnSizes, source, target, side) {
+    const moves = [];
+    let position = source;
+    let targetPosition = target;
+    if (columnSizes[source] > 1) {
+        // take the window out of its column first, into a new column on its right
+        moves.push(KarouselShortcuts.windowMoveRight);
+        position = source + 1;
+        if (target > source) {
+            targetPosition = target + 1;
+        }
+    }
+    // where the window's column goes among the other columns
+    const otherTarget = targetPosition > position ? targetPosition - 1 : targetPosition;
+    const final = side < 0 ? otherTarget : otherTarget + 1;
+    moves.push(...repeat(final < position ? KarouselShortcuts.columnMoveLeft : KarouselShortcuts.columnMoveRight, Math.abs(final - position)));
     return moves;
 }
 

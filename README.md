@@ -10,8 +10,11 @@ It needs Karousel: it drives Karousel through its key bindings, and Karousel kee
 - Toggle with Meta+Ctrl+O, a screen edge (System Settings → Screen Edges) or a touchpad swipe up (enable in the effect's settings)
 - Click a window to focus it, or click an empty part of a desktop to switch to it
 - Drag a window to another desktop to move it there, or to the "New desktop" row to create one
-- Drag a window sideways within its desktop to reorder its column (uses Karousel's "Move column left/right" key bindings), a bar shows where it lands
-- Drop a window onto another window to put it into that window's column
+- Drop a window onto another window: onto its middle to stack them (Karousel's stacked layout), onto its top or bottom to put it above or below in that column, onto its left or right quarter to give it a column of its own there; the part it drops onto is highlighted
+- Hover a window and click the button next to ✕ to make it float, or tile it again (uses Karousel's "Toggle floating")
+- Drag the grip on top of a column with several windows, or drop a window between columns, to move the whole column: onto another window all of its windows go where a single window would, it can also go to another desktop; the "Stack"/"Unstack" button in its top left corner switches the column between Karousel's stacked layout and the windows one under another
+- Drop a floating window where it would be tiled to tile it there (uses Karousel's "Move column left/right" key bindings)
+- Drag something from an app, e.g. a file, open the overview with its screen corner or shortcut and hold it over a window to switch to it and drop it there
 - Panning the current desktop scrolls Karousel's real view column by column, so that you land where you scrolled
 - Karousel's own key bindings work in the overview too, and the overview follows what they do
 - Minimized windows are shown dimmed at the end of their desktop, click one to restore it
