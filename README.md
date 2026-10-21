@@ -23,7 +23,7 @@ It needs Karousel: it drives Karousel through its key bindings, and Karousel kee
 - Double-click a desktop's label to rename it, hover the label of an empty desktop to remove it
 - Optionally, like GNOME's dynamic workspaces, desktops created in the overview are removed again once they're empty, when the overview closes; your other desktops always stay
 - Middle-click a window or use its close button to close it
-- Type to filter windows by name; if nothing matches, KRunner results are shown
+- Type to search: the field at the top grows into a panel with KRunner's results, apps and more, and the current desktop's matching windows show below it; Up or Tab goes from the windows into the results, Down from the last one back. Settings hide the field until typing starts, search only apps, or start in the results
 - Scroll vertically to jump between desktops, scroll horizontally (or Shift+scroll) to move a desktop's windows past its wallpaper, which stays in place
 - Right-click and drag anywhere in a desktop's strip, also over windows, to pan it; it keeps going when you let go fast, and settles on a column
 - Small desktops slide out when the pointer reaches the right edge, or the top: click one to go to that desktop; while dragging a window they're always shown, drop it on one to move it there, also to a desktop far away (can be turned off)

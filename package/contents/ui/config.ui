@@ -115,6 +115,48 @@
     </widget>
    </item>
    <item>
+    <widget class="QGroupBox" name="groupSearch">
+     <property name="title">
+      <string>Searching</string>
+     </property>
+     <layout class="QVBoxLayout">
+       <item>
+        <widget class="QCheckBox" name="kcfg_SearchFieldShown">
+         <property name="text">
+          <string>Search field always shown</string>
+         </property>
+         <property name="toolTip">
+          <string>Otherwise it only shows once you start typing, typing searches either way</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="kcfg_SearchWindows">
+         <property name="text">
+          <string>Search windows too</string>
+         </property>
+         <property name="toolTip">
+          <string>Typing filters the windows on the desktops; otherwise it only searches apps and more, like KRunner</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="kcfg_SearchWindowsFirst">
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+         <property name="text">
+          <string>Windows first, then apps</string>
+         </property>
+         <property name="toolTip">
+          <string>Arrows and Enter go to the matching windows, Up or Tab to the apps above them; otherwise the other way round, Enter starts the first app</string>
+         </property>
+        </widget>
+       </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <widget class="QGroupBox" name="groupDesktops">
      <property name="title">
       <string>Desktops</string>
@@ -268,6 +310,12 @@
  </widget>
  <resources/>
  <connections>
+  <connection>
+   <sender>kcfg_SearchWindows</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>kcfg_SearchWindowsFirst</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
   <connection>
    <sender>kcfg_ShowDropMinimap</sender>
    <signal>toggled(bool)</signal>

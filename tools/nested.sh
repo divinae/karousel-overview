@@ -35,6 +35,10 @@ CONFIG
 if [ -n "${KAROUSEL_CONFIG:-}" ]; then
     printf '\n[Script-karousel]\n%s\n' "$KAROUSEL_CONFIG" >> "$state/config/kwinrc"
 fi
+# OVERVIEW_CONFIG adds lines to the effect's settings, e.g. OVERVIEW_CONFIG=SearchWindowsFirst=false
+if [ -n "${OVERVIEW_CONFIG:-}" ]; then
+    printf '\n[Effect-karousel_overview]\n%s\n' "$OVERVIEW_CONFIG" >> "$state/config/kwinrc"
+fi
 # the real session's KWin takes the shortcuts with Meta before the nested one gets them, so add one without it
 cat > "$state/config/kglobalshortcutsrc" <<'CONFIG'
 [kwin]

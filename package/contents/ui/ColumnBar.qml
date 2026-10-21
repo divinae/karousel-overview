@@ -15,7 +15,51 @@ Item {
     readonly property bool alive: strip !== null
     readonly property bool dragged: alive && columnBar.strip.overviewRoot.draggedWindows.some(window => modelData.windows.includes(window))
     readonly property bool stacked: alive && columnBar.strip.isStackedColumn(modelData)
-    readonly property bool lit: gripHover.hovered || gripDrag.active
+    // the whole strip above the column grabs it, the pill shows where; it sticks out below the strip, so it grabs too
+    readonly property bool lit: stripHover.hovered || stripDrag.active || gripHover.hovered || gripDrag.active
+
+    function dragChanged(handler) {
+        const windows = modelData.windows;
+        if (handler.active) {
+            strip.overviewRoot.startDrag(windows[0], strip.thumbForWindow(windows[0]), handler.centroid.scenePressPosition, windows);
+        } else {
+            strip.overviewRoot.endDrag();
+        }
+    }
+
+    function dragMoved(handler) {
+        if (handler.active) {
+            strip.overviewRoot.moveDrag(handler.centroid.scenePosition);
+        }
+    }
+
+    // where to grab it, shown while the pointer is there
+    Rectangle {
+        anchors.fill: parent
+        anchors.bottomMargin: Kirigami.Units.smallSpacing
+        radius: Kirigami.Units.cornerRadius
+        color: columnBar.alive ? columnBar.strip.style.highlightAlpha(0.2) : "transparent"
+        opacity: columnBar.lit ? 1 : 0
+        visible: opacity > 0
+
+        Behavior on opacity {
+            NumberAnimation { duration: Kirigami.Units.shortDuration }
+        }
+    }
+
+    HoverHandler {
+        id: stripHover
+        cursorShape: Qt.SizeAllCursor
+    }
+
+    DragHandler {
+        id: stripDrag
+        target: null
+        // don't let the Flickables or the window under it steal the drag, see WindowThumb
+        grabPermissions: PointerHandler.CanTakeOverFromAnything
+        onActiveChanged: columnBar.dragChanged(stripDrag)
+        onCentroidChanged: columnBar.dragMoved(stripDrag)
+    }
 
     x: alive ? columnBar.strip.toStripX(modelData.x) : 0
     // right above the column's frame
@@ -28,7 +72,7 @@ Item {
 
     // Karousel rearranging recreates them, the drag would never end without the DragHandler that tracks it
     Component.onDestruction: {
-        if (gripDrag.active && alive) {
+        if ((gripDrag.active || stripDrag.active) && alive) {
             columnBar.strip.overviewRoot.cancelDrag();
         }
     }
@@ -84,21 +128,10 @@ Item {
         DragHandler {
             id: gripDrag
             target: null
-            // don't let the Flickables steal the drag
+            // don't let the Flickables or the window under it steal the drag, see WindowThumb
             grabPermissions: PointerHandler.CanTakeOverFromAnything
-            onActiveChanged: {
-                const windows = columnBar.modelData.windows;
-                if (active) {
-                    columnBar.strip.overviewRoot.startDrag(windows[0], columnBar.strip.thumbForWindow(windows[0]), centroid.scenePressPosition, windows);
-                } else {
-                    columnBar.strip.overviewRoot.endDrag();
-                }
-            }
-            onCentroidChanged: {
-                if (active) {
-                    columnBar.strip.overviewRoot.moveDrag(centroid.scenePosition);
-                }
-            }
+            onActiveChanged: columnBar.dragChanged(gripDrag)
+            onCentroidChanged: columnBar.dragMoved(gripDrag)
         }
     }
 

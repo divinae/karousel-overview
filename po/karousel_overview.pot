@@ -79,105 +79,138 @@ msgid "Otherwise Karousel only scrolls as far as needed to show it"
 msgstr ""
 
 #: config.ui.js:16
-msgid "Desktops"
+msgid "Searching"
 msgstr ""
 
 #: config.ui.js:17
-msgid "“New desktop” row after the last desktop"
+msgid "Search field always shown"
 msgstr ""
 
 #: config.ui.js:18
+msgid ""
+"Otherwise it only shows once you start typing, typing searches either way"
+msgstr ""
+
+#: config.ui.js:19
+msgid "Search windows too"
+msgstr ""
+
+#: config.ui.js:20
+msgid ""
+"Typing filters the windows on the desktops; otherwise it only searches apps "
+"and more, like KRunner"
+msgstr ""
+
+#: config.ui.js:21
+msgid "Windows first, then apps"
+msgstr ""
+
+#: config.ui.js:22
+msgid ""
+"Arrows and Enter go to the matching windows, Up or Tab to the apps above "
+"them; otherwise the other way round, Enter starts the first app"
+msgstr ""
+
+#: config.ui.js:23
+msgid "Desktops"
+msgstr ""
+
+#: config.ui.js:24
+msgid "“New desktop” row after the last desktop"
+msgstr ""
+
+#: config.ui.js:25
 msgid ""
 "Click it or drop a window on it to create a desktop; without it, drop a "
 "window between two desktops or after the last one"
 msgstr ""
 
-#: config.ui.js:19
+#: config.ui.js:26
 msgid "Remove empty desktops created in the overview when closing"
 msgstr ""
 
-#: config.ui.js:20
+#: config.ui.js:27
 msgid ""
 "Like GNOME's dynamic workspaces, but only for desktops created in the "
 "overview, your other desktops stay"
 msgstr ""
 
-#: config.ui.js:21
+#: config.ui.js:28
 msgid "Desktop minimap"
 msgstr ""
 
-#: config.ui.js:22
+#: config.ui.js:29
 msgid "Small desktops at the screen's edge"
 msgstr ""
 
-#: config.ui.js:23
+#: config.ui.js:30
 msgid ""
 "Small desktops slide out when the pointer reaches the edge, click one to go "
 "to it; while dragging a window they are always shown, drop it on one to move "
 "it there, also to a desktop far away"
 msgstr ""
 
-#: config.ui.js:24
+#: config.ui.js:31
 msgid "Always shown"
 msgstr ""
 
-#: config.ui.js:25
+#: config.ui.js:32
 msgid ""
 "Otherwise it slides out when the pointer reaches its edge, and while a "
 "window is dragged"
 msgstr ""
 
-#: config.ui.js:26
+#: config.ui.js:33
 msgid "Minimap along the top instead of the right edge"
 msgstr ""
 
-#: config.ui.js:27
+#: config.ui.js:34
 msgid "A row along the top instead of a column along the right edge"
 msgstr ""
 
-#: config.ui.js:28
+#: config.ui.js:35
 msgid "Touchpad"
 msgstr ""
 
-#: config.ui.js:29
+#: config.ui.js:36
 msgid "Swipe up to open the overview, down to close it"
 msgstr ""
 
-#: config.ui.js:30
+#: config.ui.js:37
 msgid "Follows your fingers"
 msgstr ""
 
-#: config.ui.js:31
+#: config.ui.js:38
 msgid "Fingers:"
 msgstr ""
 
-#: config.ui.js:32
+#: config.ui.js:39
 msgid ""
 "With 4 fingers, this clashes with Plasma's own Overview effect, which uses "
 "the same gesture"
 msgstr ""
 
-#: config.ui.js:33
+#: config.ui.js:40
 msgid ""
 "The overview also opens with Meta+Ctrl+O, and with screen edges set in "
 "System Settings, under Screen Edges."
 msgstr ""
 
-#: package/contents/ui/ColumnBar.qml:54
+#: package/contents/ui/ColumnBar.qml:98
 msgid "Move column"
 msgstr ""
 
-#: package/contents/ui/ColumnBar.qml:137
+#: package/contents/ui/ColumnBar.qml:170
 msgctxt "@action:button the windows of a column"
 msgid "Stack"
 msgstr ""
 
-#: package/contents/ui/ColumnBar.qml:137
+#: package/contents/ui/ColumnBar.qml:170
 msgctxt "@action:button the windows of a column"
 msgid "Unstack"
 msgstr ""
 
-#: package/contents/ui/DesktopPill.qml:89 package/contents/ui/DesktopRow.qml:84
+#: package/contents/ui/DesktopPill.qml:89 package/contents/ui/DesktopRow.qml:90
 msgid "New desktop"
 msgstr ""
 
@@ -248,8 +281,17 @@ msgstr ""
 msgid "Own column here"
 msgstr ""
 
-#: package/contents/ui/SearchOverlay.qml:39
-msgid "No matching windows"
+#: package/contents/ui/SearchOverlay.qml:79
+msgid "Search"
+msgstr ""
+
+#: package/contents/ui/SearchOverlay.qml:152
+msgid "Type to search"
+msgstr ""
+
+#: package/contents/ui/SearchOverlay.qml:190
+msgctxt "@action:button the search"
+msgid "Clear"
 msgstr ""
 
 #: package/contents/ui/WindowThumb.qml:217

@@ -13,6 +13,12 @@ Item {
     required property var desktop
     required property OverviewScreen overviewRoot
     property bool selected: false
+    // while searching, the current desktop's matching windows are what counts, the other desktops fade, all of them
+    // when the search is only for apps
+    opacity: overviewRoot.searching && (!selected || !overviewRoot.searchesWindows) ? 0.25 : 1
+    Behavior on opacity {
+        NumberAnimation { duration: Kirigami.Units.longDuration }
+    }
     // the desktop's number, counted from 1
     property int number: 0
 
@@ -781,7 +787,7 @@ Item {
         id: windowFilterModel
         activity: KWinComponents.Workspace.currentActivity
         desktop: row.desktop
-        filter: row.overviewRoot.searchText
+        filter: row.overviewRoot.windowFilter
         // with the minimized ones, hidden in the strip, the model doesn't take a window back in when it's restored
         minimizedWindows: true
         windowType: ~KWinComponents.WindowFilterModel.Dock &
@@ -795,7 +801,7 @@ Item {
         id: minimizedFilterModel
         activity: KWinComponents.Workspace.currentActivity
         desktop: row.desktop
-        filter: row.overviewRoot.searchText
+        filter: row.overviewRoot.windowFilter
         minimizedWindows: true
         windowType: KWinComponents.WindowFilterModel.Normal | KWinComponents.WindowFilterModel.Dialog
         windowModel: KWinComponents.WindowModel {}
@@ -888,8 +894,8 @@ Item {
         anchors.fill: parent
         // reaches a little above the row, where the columns' grips stick out: a Flickable doesn't pass on events outside
         // of itself; the margin keeps the content where it was, at the only position the bounds allow
-        anchors.topMargin: -Kirigami.Units.gridUnit
-        topMargin: Kirigami.Units.gridUnit
+        anchors.topMargin: -Kirigami.Units.gridUnit * 2
+        topMargin: Kirigami.Units.gridUnit * 2
         // not clipped, so that the wallpaper's shadow shows above and below the row
         flickableDirection: Flickable.HorizontalFlick
         boundsBehavior: Flickable.StopAtBounds

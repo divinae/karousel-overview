@@ -31,6 +31,18 @@
             <label>Clicking a window centers it on the screen, otherwise Karousel only scrolls as far as needed</label>
             <default>true</default>
         </entry>
+        <entry name="SearchFieldShown" type="Bool">
+            <label>The search field is always shown, otherwise only once typing starts</label>
+            <default>true</default>
+        </entry>
+        <entry name="SearchWindows" type="Bool">
+            <label>Typing filters the windows too, otherwise it only searches KRunner's results, apps and more</label>
+            <default>true</default>
+        </entry>
+        <entry name="SearchWindowsFirst" type="Bool">
+            <label>Typing goes to the matching windows first, otherwise to KRunner's results, apps and more</label>
+            <default>true</default>
+        </entry>
         <entry name="ShowDropMinimap" type="Bool">
             <label>Show small desktops along the right edge when the pointer reaches it and while dragging a window, to go to or drop it on any of them</label>
             <default>true</default>

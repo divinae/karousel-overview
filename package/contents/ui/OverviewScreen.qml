@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
+import org.kde.milou as Milou
 import "layout.js" as Layout
 
 Item {
@@ -56,6 +57,26 @@ Item {
     // the current desktop of this screen, kept up to date
     property var activeDesktop: currentDesktop()
     property string searchText: ""
+    // while searching, the keys go to the results instead of the windows: after Up or Tab from the windows, from the
+    // start with the setting for apps first, or when no window on the current desktop matches; Down on the last result
+    // goes back
+    property bool resultsFocused: false
+    // there are results to go to, also while KRunner is still looking, Enter then runs the first one once it's there
+    readonly property bool searchHasResults: searchText !== "" && searchOverlay.resultsView !== null
+        && ((searchOverlay.resultsView as ListView).count > 0 || (searchOverlay.resultsView as Milou.ResultsView).querying)
+    // windows on the current desktop match the search
+    readonly property bool rowHasMatches: currentRow !== null && currentRow.windowCount > 0
+    readonly property bool keysToResults: searchHasResults && (resultsFocused || !rowHasMatches || !searchesWindows)
+    readonly property bool searching: searchText !== ""
+    // whether the search filters the windows too, or only looks for apps and more, see the setting
+    readonly property bool searchesWindows: config.SearchWindows
+    readonly property string windowFilter: searchesWindows ? searchText : ""
+    // while searching, the results are right below the search field, in a space of their own that doesn't change with
+    // them, so that the windows below don't move as they come; as much as the row of windows leaves, within limits
+    readonly property real resultsHeight: Math.max(Kirigami.Units.gridUnit * 6,
+        Math.min(height * 0.35, height - rowHeight - searchOverlay.fieldBottom - Kirigami.Units.gridUnit * 3))
+    // where the current row is, in the middle, or while searching below the results
+    readonly property real rowsTop: searching && searchesWindows ? searchOverlay.fieldBottom + resultsHeight + Kirigami.Units.gridUnit * 2 : (height - rowHeight) / 2
 
     // set once everything is laid out, so that the zoom always animates from 0
     property bool organized: false
@@ -303,7 +324,64 @@ Item {
         dragController.cancel();
     }
 
+    // the results' keys, handled here rather than by Milou's view, whose Tab moves the keyboard focus out of the overview
+    function handleResultsKey(event) {
+        const view = searchOverlay.resultsView as ListView;
+        // a page of results, about what the card shows
+        const page = 5;
+        switch (event.key) {
+        case Qt.Key_Up:
+            view.currentIndex = Math.max(0, view.currentIndex - 1);
+            return true;
+        // the windows are below the results
+        case Qt.Key_Down:
+            if (view.currentIndex < view.count - 1) {
+                view.incrementCurrentIndex();
+            } else if (rowHasMatches) {
+                resultsFocused = false;
+            }
+            return true;
+        case Qt.Key_PageUp:
+            view.currentIndex = Math.max(0, view.currentIndex - page);
+            return true;
+        case Qt.Key_PageDown:
+            view.currentIndex = Math.min(view.count - 1, view.currentIndex + page);
+            return true;
+        case Qt.Key_Home:
+            view.currentIndex = 0;
+            return true;
+        case Qt.Key_End:
+            view.currentIndex = view.count - 1;
+            return true;
+        case Qt.Key_Return:
+        case Qt.Key_Enter:
+            (view as Milou.ResultsView).runCurrentIndex(event);
+            return true;
+        case Qt.Key_Tab:
+        case Qt.Key_Backtab:
+            if (rowHasMatches) {
+                resultsFocused = false;
+            }
+            return true;
+        // the windows' keys, the selected window isn't what the keys are on now
+        case Qt.Key_Left:
+        case Qt.Key_Right:
+        case Qt.Key_Delete:
+            return true;
+        }
+        return false;
+    }
+
+    function focusResults() {
+        resultsFocused = true;
+        (searchOverlay.resultsView as ListView).currentIndex = 0;
+    }
+
     function handleKey(event) {
+        if (keysToResults && handleResultsKey(event)) {
+            event.accepted = true;
+            return;
+        }
         switch (event.key) {
         case Qt.Key_Escape:
             if (searchText !== "") {
@@ -312,11 +390,25 @@ Item {
                 overview.sceneEffect.deactivate();
             }
             break;
+        // while searching, the results are above the windows, and the other desktops are out of the way
         case Qt.Key_Up:
-            selectRow(-1);
+            if (searchHasResults) {
+                focusResults();
+            } else if (!searching) {
+                selectRow(-1);
+            }
             break;
         case Qt.Key_Down:
-            selectRow(1);
+            if (!searching) {
+                selectRow(1);
+            }
+            break;
+        case Qt.Key_Tab:
+        case Qt.Key_Backtab:
+            if (!searchHasResults) {
+                return;
+            }
+            focusResults();
             break;
         case Qt.Key_Left:
             overview.currentRow?.selectNeighbour(-1);
@@ -364,9 +456,15 @@ Item {
         id: externalDragItem
         anchors.fill: parent
         overviewRoot: overview // qmllint disable incompatible-type
+        pointerHovered: pointerHover.hovered
+    }
+
+    HoverHandler {
+        id: pointerHover
     }
 
     Backdrop {
+        id: backdrop
         anchors.fill: parent
         screen: overview.targetScreen
         desktop: overview.activeDesktop
@@ -411,7 +509,27 @@ Item {
         spacing: Kirigami.Units.gridUnit * 2
         interactive: overview.draggedWindow === null
         highlightRangeMode: ListView.StrictlyEnforceRange
-        preferredHighlightBegin: (height - overview.rowHeight) / 2
+        preferredHighlightBegin: overview.rowsTop
+        // the list doesn't move the current row by itself when a search moves it, it glides there; without the
+        // highlight range meanwhile, which would make the row passing through it current
+        function glideToRowsTop() {
+            // a glide still running puts the range back when it stops, before it's turned off for this one
+            rowsGlide.stop();
+            const from = contentY;
+            positionViewAtIndex(currentIndex, ListView.SnapPosition);
+            rowsGlide.to = contentY;
+            highlightRangeMode = ListView.NoHighlightRange;
+            contentY = from;
+            rowsGlide.start();
+        }
+        NumberAnimation {
+            id: rowsGlide
+            target: rows
+            property: "contentY"
+            duration: Kirigami.Units.longDuration
+            easing.type: Easing.OutCubic
+            onStopped: rows.highlightRangeMode = ListView.StrictlyEnforceRange
+        }
         preferredHighlightEnd: preferredHighlightBegin + overview.rowHeight
         highlightMoveDuration: overview.sceneEffect.animationDuration
         // keep all rows around, so that a dragged window's row isn't destroyed when scrolled away and every desktop's row
@@ -519,7 +637,8 @@ Item {
     WheelNavigation {
         anchors.fill: parent
         z: 1
-        enabled: searchOverlay.resultsView === null
+        // the current desktop's matching windows and the results stay while searching
+        enabled: !overview.searching
         overviewRoot: overview // qmllint disable incompatible-type
     }
 
@@ -535,11 +654,22 @@ Item {
         id: searchOverlay
         anchors.fill: parent
         z: 3
+        opacity: overview.zoom
         searchText: overview.searchText
-        showResults: overview.currentRow === null || overview.currentRow.windowCount === 0
+        fieldAlwaysShown: overview.config.SearchFieldShown
+        resultsHeight: overview.resultsHeight
+        resultsFocused: overview.keysToResults
+        // what the panel blurs behind it
+        blurSources: [backdrop, rows]
         onResultActivated: overview.sceneEffect.deactivate()
+        onClearRequested: overview.searchText = ""
     }
 
+    // a new search starts where the setting says, at the windows or at the results, the row glides under the field
+    onSearchingChanged: {
+        resultsFocused = searching && !config.SearchWindowsFirst;
+        Qt.callLater(rows.glideToRowsTop);
+    }
     onSearchTextChanged: Qt.callLater(refreshSelection)
 
     // the selection follows focus changes from outside the overview, e.g. Karousel's key bindings
@@ -606,7 +736,6 @@ Item {
         }
     }
 
-    Keys.forwardTo: searchOverlay.resultsView !== null ? [searchOverlay.resultsView] : []
     Keys.onPressed: event => handleKey(event)
 
     Component.onDestruction: overview.sceneEffect.overviewDestroyed()

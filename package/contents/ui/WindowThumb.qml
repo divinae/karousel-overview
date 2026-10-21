@@ -284,8 +284,10 @@ Item {
 
     DragHandler {
         target: null
-        // don't let the Flickables steal the drag
-        grabPermissions: PointerHandler.CanTakeOverFromAnything
+        // don't let the Flickables steal the drag, but the column's grip, which sits partly over the window, may have
+        // it; this one doesn't take it from the grip, which would move the window alone instead of the column
+        grabPermissions: PointerHandler.CanTakeOverFromItems | PointerHandler.CanTakeOverFromHandlersOfDifferentType
+            | PointerHandler.ApprovesTakeOverByHandlersOfSameType
         onActiveChanged: {
             if (active) {
                 thumb.overviewRoot.startDrag(thumb.window, thumb, centroid.scenePressPosition);

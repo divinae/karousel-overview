@@ -10,6 +10,14 @@ Item {
     id: externalDrag
 
     required property OverviewScreen overviewRoot
+    // the pointer hovers the overview, which its own events do, an app's drag keeps them from it; on the overview
+    // itself, whose children all pass their hover up to it, a handler beneath them wouldn't see it over the windows
+    required property bool pointerHovered
+    onPointerHoveredChanged: {
+        if (pointerHovered) {
+            end();
+        }
+    }
 
     property bool active: false
     property var window: null
@@ -20,7 +28,7 @@ Item {
         const cursor = KWinComponents.Workspace.cursorPos;
         const point = Qt.point(cursor.x - overviewRoot.screenGeometry.x, cursor.y - overviewRoot.screenGeometry.y);
         // the pointer's own events would have reached the overview by now, see onCursorPosChanged
-        if (pointerHover.hovered || overviewRoot.draggedWindow !== null || !overviewRoot.sceneEffect.activated || overviewRoot.activating
+        if (pointerHovered || overviewRoot.draggedWindow !== null || !overviewRoot.sceneEffect.activated || overviewRoot.activating
                 || point.x < 0 || point.y < 0 || point.x >= overviewRoot.width || point.y >= overviewRoot.height) {
             end();
             return;
@@ -73,21 +81,12 @@ Item {
         }
     }
 
-    HoverHandler {
-        id: pointerHover
-        onHoveredChanged: {
-            if (hovered) {
-                externalDrag.end();
-            }
-        }
-    }
-
     Connections {
         target: KWinComponents.Workspace
         // after the overview had the event, if it was the pointer's own
         function onCursorPosChanged() {
             // most moves are the pointer's own, over the overview
-            if (externalDrag.active || !pointerHover.hovered) {
+            if (externalDrag.active || !externalDrag.pointerHovered) {
                 Qt.callLater(externalDrag.update);
             }
         }
