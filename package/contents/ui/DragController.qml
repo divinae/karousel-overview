@@ -4,6 +4,7 @@ import QtQuick
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
 import "layout.js" as Layout
+import "i18n.js" as I18n
 
 // dragging a window: the thumbnail following the pointer, and scrolling and switching desktops on the way
 Item {
@@ -99,6 +100,7 @@ Item {
         side = 0;
         hoveredGap = -1;
         columnWindows = [];
+        lastState = null;
         overMinimap = false;
         minimapIndex = -1;
     }
@@ -108,6 +110,37 @@ Item {
         if (window === null) {
             return;
         }
+        lastState = dragState();
+        // the row under it works out its columns once for all that's checked here
+        const row = overviewRoot.rowAt(position);
+        row?.cacheColumns(true);
+        try {
+            update();
+        } finally {
+            row?.cacheColumns(false);
+        }
+    }
+
+    // what refresh depends on: where the dragged window is, and what's under it, which also moves under a still
+    // pointer, e.g. while the rows scroll, a row pans or Karousel rearranges
+    property var lastState: null
+    function dragState() {
+        const row = overviewRoot.rowAt(position);
+        const thumb = row !== null ? overviewRoot.thumbAt(position) : null;
+        return {
+            x: position.x, y: position.y, row: row, columns: row?.columns ?? null, contentX: row?.contentX ?? 0,
+            rows: overviewRoot.rowsPosition, minimap: overviewRoot.minimapShown, desktop: overviewRoot.activeDesktop,
+            desktops: KWinComponents.Workspace.desktops.length, thumb: thumb,
+            thumbRect: thumb !== null ? [thumb.x, thumb.y, thumb.width, thumb.height].join() : "",
+        };
+    }
+
+    function changed() {
+        const now = dragState();
+        return lastState === null || Object.keys(now).some(key => now[key] !== lastState[key]);
+    }
+
+    function update() {
         // over the minimap only its cards are targets, not the rows behind it
         overMinimap = overviewRoot.minimapContains(position);
         minimapIndex = overviewRoot.minimapIndexAt(position);
@@ -118,10 +151,10 @@ Item {
             tileWindow = null;
             setHintRow(null);
             const desktops = KWinComponents.Workspace.desktops;
-            const what = wholeColumn ? "Move column to " : "Move to ";
             dropAction = minimapIndex === -1 || (minimapIndex < desktops.length && overviewRoot.isOnDesktop(window, desktops[minimapIndex])) ? ""
-                : wholeColumn && !overviewRoot.canMoveColumnTo(minimapIndex) ? ""
-                : minimapIndex === desktops.length ? what + "a new desktop" : what + desktops[minimapIndex].name;
+                : wholeColumn && !overviewRoot.desktopActions.canMoveColumnTo(minimapIndex) ? ""
+                : minimapIndex === desktops.length ? (wholeColumn ? I18n.tr("Move column to a new desktop") : I18n.tr("Move to a new desktop"))
+                : wholeColumn ? I18n.tr("Move column to %1", desktops[minimapIndex].name) : I18n.tr("Move to %1", desktops[minimapIndex].name);
             return;
         }
         hoveredRow = overviewRoot.rowAt(position);
@@ -134,23 +167,16 @@ Item {
         if (hoveredRow !== null && (wholeColumn ? hoveredRow.hasWindow(window) : hoveredRow.placesWindow(window))) {
             const thumb = overviewRoot.thumbAt(position);
             if (thumb !== null && thumb.window !== window && !columnWindows.includes(thumb.window)) {
-                // the outer quarters of the thumbnail's width are its sides, of the rest the top and bottom fifths,
-                // and what's left is the middle, unless the window shares a column that isn't stacked, then it's
-                // the top or bottom half
+                // the window's sides, top and bottom, or middle, see Layout.dropZone; the middle stacks only where
+                // Karousel can, a window that shares a column that isn't stacked has its top and bottom halves instead
                 const point = thumb.mapFromItem(controller, position.x, position.y);
-                const dx = point.x / thumb.width - 0.5;
-                const dy = point.y / thumb.height - 0.5;
-                stacked = false;
-                if (Math.abs(dx) > 0.25) {
+                const zone = Layout.dropZone(point.x / thumb.width - 0.5, point.y / thumb.height - 0.5, hoveredRow.canStackWith(thumb.window));
+                side = zone.side;
+                stacked = zone.kind === "stack";
+                if (zone.kind === "tile") {
                     tileWindow = thumb.window;
-                    side = dx < 0 ? -1 : 1;
-                } else if (Math.abs(dy) > 0.3 || !hoveredRow.canStackWith(thumb.window)) {
-                    targetWindow = thumb.window;
-                    side = dy < 0 ? -1 : 1;
                 } else {
                     targetWindow = thumb.window;
-                    side = 1;
-                    stacked = true;
                 }
             }
         }
@@ -169,16 +195,16 @@ Item {
         const row = hoveredRow;
         setHintRow(row);
         if (row === null) {
-            dropAction = hoveredGap === -1 ? "" : !wholeColumn ? "Move to a new desktop here"
-                : overviewRoot.canMoveColumnTo(KWinComponents.Workspace.desktops.length) ? "Move column to a new desktop here" : "";
+            dropAction = hoveredGap === -1 ? "" : !wholeColumn ? I18n.tr("Move to a new desktop here")
+                : overviewRoot.desktopActions.canMoveColumnTo(KWinComponents.Workspace.desktops.length) ? I18n.tr("Move column to a new desktop here") : "";
             return;
         }
         if (!row.hasWindow(window) && wholeColumn) {
             // Karousel puts it at the end of that desktop
             const index = row.desktop !== null ? KWinComponents.Workspace.desktops.indexOf(row.desktop) : KWinComponents.Workspace.desktops.length;
-            if (overviewRoot.canMoveColumnTo(index)) {
+            if (overviewRoot.desktopActions.canMoveColumnTo(index)) {
                 row.showMoveHint();
-                dropAction = row.desktop !== null ? "Move column to " + row.desktop.name : "Move column to a new desktop";
+                dropAction = row.desktop !== null ? I18n.tr("Move column to %1", row.desktop.name) : I18n.tr("Move column to a new desktop");
             } else {
                 row.hideHints();
                 dropAction = "";
@@ -186,17 +212,17 @@ Item {
         } else if (!row.placesWindow(window)) {
             // holding it there makes that desktop current, then it can be put at a place in it
             row.showMoveHint();
-            dropAction = row.desktop !== null ? "Move to " + row.desktop.name + ", hold to place it" : "Move to a new desktop";
+            dropAction = row.desktop !== null ? I18n.tr("Move to %1, hold to place it", row.desktop.name) : I18n.tr("Move to a new desktop");
         } else if (targetWindow !== null) {
-            dropAction = !row.showStackHint(window, targetWindow, side, stacked) ? "" : stacked ? "Stack together"
-                : side < 0 ? "Above in this column" : "Below in this column";
+            dropAction = !row.showStackHint(window, targetWindow, side, stacked) ? "" : stacked ? I18n.tr("Stack together")
+                : side < 0 ? I18n.tr("Above in this column") : I18n.tr("Below in this column");
         } else if (tileWindow !== null) {
             dropAction = !row.showTileHint(window, tileWindow, side, wholeColumn) ? ""
-                : wholeColumn ? (side < 0 ? "Column on the left" : "Column on the right")
-                : side < 0 ? "Own column on the left" : "Own column on the right";
+                : wholeColumn ? (side < 0 ? I18n.tr("Column on the left") : I18n.tr("Column on the right"))
+                : side < 0 ? I18n.tr("Own column on the left") : I18n.tr("Own column on the right");
         } else {
             row.showInsertHint(window, position.x, wholeColumn);
-            dropAction = isNaN(row.insertHintX) ? "" : !wholeColumn && row.sharesColumn(window) ? "Own column here" : "Move column here";
+            dropAction = isNaN(row.insertHintX) ? "" : !wholeColumn && row.sharesColumn(window) ? I18n.tr("Own column here") : I18n.tr("Move column here");
         }
     }
 
@@ -215,7 +241,9 @@ Item {
                 controller.hoveredRow?.panBy(-speed * Kirigami.Units.gridUnit * 1.5);
             }
             // the content moves under the pointer while scrolling, also when rows change or Karousel rearranges
-            controller.refresh();
+            if (speed !== 0 || controller.changed()) {
+                controller.refresh();
+            }
         }
     }
 

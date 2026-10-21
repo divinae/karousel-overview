@@ -1,0 +1,268 @@
+# Polish translations for karousel_overview package
+# Polskie tłumaczenia dla pakietu karousel_overview.
+# Copyright (C) 2026 THE karousel_overview'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the karousel_overview package.
+# Automatically generated, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: karousel_overview\n"
+"Report-Msgid-Bugs-To: https://github.com/divinae/karousel-overview/issues\n"
+"PO-Revision-Date: 2026-10-21 13:00+0200\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: pl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 "
+"|| n%100>=20) ? 1 : 2);\n"
+
+#: config.ui.js:1
+msgid "Overview"
+msgstr "Przegląd"
+
+#: config.ui.js:2
+msgid "Height of a desktop row:"
+msgstr "Wysokość wiersza pulpitu:"
+
+#: config.ui.js:3
+msgid "In percent of the screen height"
+msgstr "W procentach wysokości ekranu"
+
+#: config.ui.js:4
+msgid "%"
+msgstr "%"
+
+#: config.ui.js:5
+msgid "App icons on windows"
+msgstr "Ikony aplikacji na oknach"
+
+#: config.ui.js:6
+msgid "An app icon at the bottom of each window"
+msgstr "Ikona aplikacji na dole każdego okna"
+
+#: config.ui.js:7
+msgid "Window titles on windows"
+msgstr "Tytuły okien na oknach"
+
+#: config.ui.js:8
+msgid "Otherwise a window's title shows when you hover it"
+msgstr "W przeciwnym razie tytuł okna pokazuje się po najechaniu na nie"
+
+#: config.ui.js:9
+msgid "Minimized windows after each desktop"
+msgstr "Zminimalizowane okna za każdym pulpitem"
+
+#: config.ui.js:10
+msgid "Shown dimmed at the end of their desktop, click one to restore it"
+msgstr "Wyszarzone na końcu swojego pulpitu, kliknij, aby przywrócić okno"
+
+#: config.ui.js:11
+msgid "Blur behind translucent windows"
+msgstr "Rozmycie za przezroczystymi oknami"
+
+#: config.ui.js:12
+msgid ""
+"Blurs the wallpaper behind translucent windows, like KWin's blur effect does "
+"on the desktop"
+msgstr "Rozmywa tapetę za przezroczystymi oknami, tak jak efekt rozmycia KWin na pulpicie"
+
+#: config.ui.js:13
+msgid "Clicking a window"
+msgstr "Kliknięcie okna"
+
+#: config.ui.js:14
+msgid "Center it on the screen"
+msgstr "Wyśrodkuj je na ekranie"
+
+#: config.ui.js:15
+msgid "Otherwise Karousel only scrolls as far as needed to show it"
+msgstr "W przeciwnym razie Karousel przewija tylko tyle, ile trzeba, aby je pokazać"
+
+#: config.ui.js:16
+msgid "Desktops"
+msgstr "Pulpity"
+
+#: config.ui.js:17
+msgid "“New desktop” row after the last desktop"
+msgstr "Wiersz „Nowy pulpit” za ostatnim pulpitem"
+
+#: config.ui.js:18
+msgid ""
+"Click it or drop a window on it to create a desktop; without it, drop a "
+"window between two desktops or after the last one"
+msgstr "Kliknij go albo upuść na nim okno, aby utworzyć pulpit; bez niego upuść okno między dwoma pulpitami albo za ostatnim"
+
+#: config.ui.js:19
+msgid "Remove empty desktops created in the overview when closing"
+msgstr "Usuwaj przy zamykaniu puste pulpity utworzone w przeglądzie"
+
+#: config.ui.js:20
+msgid ""
+"Like GNOME's dynamic workspaces, but only for desktops created in the "
+"overview, your other desktops stay"
+msgstr "Jak dynamiczne obszary robocze w GNOME, ale tylko dla pulpitów utworzonych w przeglądzie, pozostałe twoje pulpity zostają"
+
+#: config.ui.js:21
+msgid "Desktop minimap"
+msgstr "Minimapa pulpitów"
+
+#: config.ui.js:22
+msgid "Small desktops at the screen's edge"
+msgstr "Małe pulpity przy krawędzi ekranu"
+
+#: config.ui.js:23
+msgid ""
+"Small desktops slide out when the pointer reaches the edge, click one to go "
+"to it; while dragging a window they are always shown, drop it on one to move "
+"it there, also to a desktop far away"
+msgstr "Małe pulpity wysuwają się, gdy wskaźnik dotrze do krawędzi, kliknij jeden, aby do niego przejść; podczas przeciągania okna są zawsze widoczne, upuść je na jednym, aby je tam przenieść, także na odległy pulpit"
+
+#: config.ui.js:24
+msgid "Always shown"
+msgstr "Zawsze widoczna"
+
+#: config.ui.js:25
+msgid ""
+"Otherwise it slides out when the pointer reaches its edge, and while a "
+"window is dragged"
+msgstr "W przeciwnym razie wysuwa się, gdy wskaźnik dotrze do jej krawędzi, i podczas przeciągania okna"
+
+#: config.ui.js:26
+msgid "Minimap along the top instead of the right edge"
+msgstr "Minimapa u góry zamiast przy prawej krawędzi"
+
+#: config.ui.js:27
+msgid "A row along the top instead of a column along the right edge"
+msgstr "Rząd u góry zamiast kolumny przy prawej krawędzi"
+
+#: config.ui.js:28
+msgid "Touchpad"
+msgstr "Touchpad"
+
+#: config.ui.js:29
+msgid "Swipe up to open the overview, down to close it"
+msgstr "Przesunięcie w górę otwiera przegląd, w dół go zamyka"
+
+#: config.ui.js:30
+msgid "Follows your fingers"
+msgstr "Podąża za palcami"
+
+#: config.ui.js:31
+msgid "Fingers:"
+msgstr "Palce:"
+
+#: config.ui.js:32
+msgid ""
+"With 4 fingers, this clashes with Plasma's own Overview effect, which uses "
+"the same gesture"
+msgstr "Przy 4 palcach koliduje to z efektem Przegląd w Plasmie, który używa tego samego gestu"
+
+#: config.ui.js:33
+msgid ""
+"The overview also opens with Meta+Ctrl+O, and with screen edges set in "
+"System Settings, under Screen Edges."
+msgstr "Przegląd otwiera się też skrótem Meta+Ctrl+O oraz krawędziami ekranu ustawionymi w Ustawieniach systemowych, w sekcji Krawędzie ekranu."
+
+#: package/contents/ui/ColumnBar.qml:54
+msgid "Move column"
+msgstr "Przenieś kolumnę"
+
+#: package/contents/ui/ColumnBar.qml:137
+msgctxt "@action:button the windows of a column"
+msgid "Stack"
+msgstr "Ułóż w stos"
+
+#: package/contents/ui/ColumnBar.qml:137
+msgctxt "@action:button the windows of a column"
+msgid "Unstack"
+msgstr "Rozłóż stos"
+
+#: package/contents/ui/DesktopPill.qml:89 package/contents/ui/DesktopRow.qml:84
+msgid "New desktop"
+msgstr "Nowy pulpit"
+
+#: package/contents/ui/DragController.qml:156
+#: package/contents/ui/DragController.qml:207
+msgid "Move column to a new desktop"
+msgstr "Przenieś kolumnę na nowy pulpit"
+
+#: package/contents/ui/DragController.qml:156
+#: package/contents/ui/DragController.qml:215
+msgid "Move to a new desktop"
+msgstr "Przenieś na nowy pulpit"
+
+#: package/contents/ui/DragController.qml:157
+#: package/contents/ui/DragController.qml:207
+msgid "Move column to %1"
+msgstr "Przenieś kolumnę na %1"
+
+#: package/contents/ui/DragController.qml:157
+msgid "Move to %1"
+msgstr "Przenieś na %1"
+
+#: package/contents/ui/DragController.qml:198
+msgid "Move to a new desktop here"
+msgstr "Przenieś na nowy pulpit tutaj"
+
+#: package/contents/ui/DragController.qml:199
+msgid "Move column to a new desktop here"
+msgstr "Przenieś kolumnę na nowy pulpit tutaj"
+
+#: package/contents/ui/DragController.qml:215
+msgid "Move to %1, hold to place it"
+msgstr "Przenieś na %1, przytrzymaj, aby wybrać miejsce"
+
+#: package/contents/ui/DragController.qml:217
+msgid "Stack together"
+msgstr "Ułóż razem w stos"
+
+#: package/contents/ui/DragController.qml:218
+msgid "Above in this column"
+msgstr "Nad, w tej kolumnie"
+
+#: package/contents/ui/DragController.qml:218
+msgid "Below in this column"
+msgstr "Pod, w tej kolumnie"
+
+#: package/contents/ui/DragController.qml:221
+msgid "Column on the left"
+msgstr "Kolumna po lewej"
+
+#: package/contents/ui/DragController.qml:221
+msgid "Column on the right"
+msgstr "Kolumna po prawej"
+
+#: package/contents/ui/DragController.qml:222
+msgid "Own column on the left"
+msgstr "Osobna kolumna po lewej"
+
+#: package/contents/ui/DragController.qml:222
+msgid "Own column on the right"
+msgstr "Osobna kolumna po prawej"
+
+#: package/contents/ui/DragController.qml:225
+msgid "Move column here"
+msgstr "Przenieś kolumnę tutaj"
+
+#: package/contents/ui/DragController.qml:225
+msgid "Own column here"
+msgstr "Osobna kolumna tutaj"
+
+#: package/contents/ui/SearchOverlay.qml:39
+msgid "No matching windows"
+msgstr "Brak pasujących okien"
+
+#: package/contents/ui/WindowThumb.qml:217
+msgctxt "@action:button a window"
+msgid "Close"
+msgstr "Zamknij"
+
+#: package/contents/ui/WindowThumb.qml:248
+msgid "Toggle floating"
+msgstr "Przełącz pływanie"
+
+#: package/contents/ui/main.qml:99
+msgid "Karousel: Toggle overview"
+msgstr "Karousel: Przełącz przegląd"

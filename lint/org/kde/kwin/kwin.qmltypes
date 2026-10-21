@@ -48,6 +48,9 @@ Module {
         Property { name: "currentActivity"; type: "QString" }
         Property { name: "activeWindow"; type: "QVariant" }
         Property { name: "screens"; type: "QVariant"; isReadonly: true }
+        Property { name: "cursorPos"; type: "QPoint"; isReadonly: true }
+        Signal { name: "cursorPosChanged" }
+        Signal { name: "currentActivityChanged" }
         Signal { name: "windowRemoved"; Parameter { name: "window"; type: "QVariant" } }
         Signal { name: "windowActivated"; Parameter { name: "window"; type: "QVariant" } }
         Signal { name: "currentDesktopChanged" }

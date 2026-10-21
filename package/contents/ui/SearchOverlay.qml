@@ -4,6 +4,7 @@ import QtQuick
 import org.kde.kirigami as Kirigami
 import org.kde.milou as Milou
 import org.kde.plasma.extras as PlasmaExtras
+import "i18n.js" as I18n
 
 // the search text, and KRunner results when no window matches it
 Item {
@@ -35,7 +36,7 @@ Item {
                 anchors.top: parent.top
                 anchors.topMargin: Kirigami.Units.largeSpacing
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "No matching windows"
+                text: I18n.tr("No matching windows")
             }
 
             Milou.ResultsView {

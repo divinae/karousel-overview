@@ -2,6 +2,7 @@ import QtQuick
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
 import "layout.js" as Layout
+import "i18n.js" as I18n
 
 KWinComponents.SceneEffect {
     id: effect
@@ -14,8 +15,13 @@ KWinComponents.SceneEffect {
     property var temporaryDesktops: []
     // where each window was while its desktop was the current one, which is where Karousel lays it out; once its
     // desktop isn't current any more, KWin pulls the windows that are far off screen back onto it, on top of each other;
-    // by window id, changed in place, nothing binds to it
+    // by layoutKey, changed in place, nothing binds to it
     property var layouts: ({})
+
+    // Karousel has a layout for each desktop in each activity, a window in several activities has one in each
+    function layoutKey(window) {
+        return window.internalId.toString() + "/" + KWinComponents.Workspace.currentActivity;
+    }
     // Karousel's gaps in pixels, measured by the overview from its layout and kept for the next time it opens, see
     // DesktopRow's refreshBounds; -1 for the vertical one until there's a column with more than one window to measure
     property real horizontalGap: 0
@@ -25,7 +31,7 @@ KWinComponents.SceneEffect {
         const desktop = window.desktops.length === 1 ? window.desktops[0] : null;
         if (desktop !== null && desktop === KWinComponents.Workspace.currentDesktopForScreen(window.output)) {
             const geometry = window.frameGeometry;
-            layouts[window.internalId.toString()] = {
+            layouts[layoutKey(window)] = {
                 geometry: Qt.rect(geometry.x, geometry.y, geometry.width, geometry.height),
                 desktop: desktop.id,
             };
@@ -34,7 +40,7 @@ KWinComponents.SceneEffect {
 
     // null when not known for the desktop the window is on now, e.g. after it was moved to another one
     function rememberedGeometry(window) {
-        const layout = layouts[window.internalId.toString()];
+        const layout = layouts[layoutKey(window)];
         return layout !== undefined && window.desktops.length === 1 && layout.desktop === window.desktops[0].id ? layout.geometry : null;
     }
 
@@ -52,7 +58,11 @@ KWinComponents.SceneEffect {
                 effect.rememberGeometry(tracker.window);
             }
             Component.onCompleted: effect.rememberGeometry(tracker.window)
-            Component.onDestruction: delete effect.layouts[tracker.windowId]
+            Component.onDestruction: {
+                for (const key of Object.keys(effect.layouts).filter(key => key.startsWith(tracker.windowId + "/"))) {
+                    delete effect.layouts[key];
+                }
+            }
         }
     }
     // qmllint enable unqualified
@@ -86,7 +96,7 @@ KWinComponents.SceneEffect {
 
     KWinComponents.ShortcutHandler {
         name: "Karousel Overview"
-        text: "Karousel: Toggle overview"
+        text: I18n.tr("Karousel: Toggle overview")
         sequence: "Meta+Ctrl+O"
         onActivated: effect.toggle()
     }

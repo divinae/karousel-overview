@@ -14,6 +14,8 @@ shift
 mkdir -p "$state/config" "$state/cache" "$state/state" "$state/data"
 # the installed effect and Karousel, the rest of the data directory stays separate
 ln -sfn "${XDG_DATA_HOME:-$HOME/.local/share}/kwin" "$state/data/kwin"
+# and the effect's translations, installed by make install
+ln -sfn "${XDG_DATA_HOME:-$HOME/.local/share}/locale" "$state/data/locale"
 cat > "$state/config/kwinrc" <<CONFIG
 [Plugins]
 karouselEnabled=true

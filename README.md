@@ -45,6 +45,12 @@ After updating, restart KWin (or log out and back in) to load the new version.
 - With multiple screens, each screen only shows the windows that are on it (Karousel itself doesn't support multiple screens)
 - The 4-finger swipe clashes with Plasma's own Overview effect
 - Desktops other than the current one show their windows where Karousel last placed them
+- Installed from the KDE Store, only the settings are translated: KWin looks for the effect's own translations in `~/.local/share/locale`, which `make install` fills, but the store's installer doesn't
+
+## Translating
+The texts are in `po/`: `po/karousel_overview.pot` has all of them, each language has its `po/<language>.po`, e.g. `po/pl.po`.
+To add a language, copy the template, e.g. `msginit --input=po/karousel_overview.pot --locale=de --output=po/de.po`, translate it and send a pull request.
+`make messages` collects the texts again after they change, `make install` compiles and installs the translations.
 
 ## Support
 If you find the overview useful, you can buy me a coffee on [Ko-fi](https://ko-fi.com/divinae4535).
@@ -55,6 +61,8 @@ Instead, `make nested` installs the effect and starts a headless KWin with its o
 `make test` runs the unit tests of the layout logic in `layout.js` with node.
 `WINDOWED=1 tools/nested.sh <state dir>` runs it in a window of the current session instead, to try it with the mouse; there the top-left corner and Ctrl+Alt+O toggle the overview, since the real session takes the shortcuts with Meta.
 `make lint` must pass without warnings; KWin's QML module only exists inside KWin, so `lint/` describes the part of it the effect uses.
+The effect's texts go through `I18n.tr()` from `i18n.js`, which gives them the effect's translation domain; after changing them, `make messages` updates `po/`, CI checks that it did.
+The scripts in `tools/` that drive a nested KWin only use its own D-Bus session: `tools/nested-run.sh` refuses to run without one, so nothing reaches the real session.
 After changing a shader in `shaders/`, `make shaders` rebuilds the compiled ones in the package, which are committed so that installing doesn't need Qt's shader tools.
 
 To release, set the version in `package/metadata.json`, rename the changelog's "Unreleased" section to it, commit, then push a tag like `v0.4`; the release workflow checks it, builds the package and publishes it with that section as the notes.

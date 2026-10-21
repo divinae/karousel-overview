@@ -4,6 +4,7 @@ import QtQuick
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
 import "layout.js" as Layout
+import "i18n.js" as I18n
 
 Item {
     id: row
@@ -37,6 +38,8 @@ Item {
     property real stripMaxX: screenGeometry.x + screenGeometry.width
     // windows grouped by column, sorted from left to right
     property var columns: []
+    // those with more than one window, which get a frame and a grip
+    readonly property var sharedColumns: columns.filter(column => column.windows.length > 1)
     readonly property int windowCount: thumbs.count
     // where a dragged column would land, in the strip's coordinates, NaN when not dragging one
     property real insertHintX: NaN
@@ -44,9 +47,8 @@ Item {
     property var stackHint: null
     // a dragged window would move to this desktop
     property bool moveHint: false
-    property bool editingName: false
     // panning the current desktop's row scrolls Karousel's real view by whole columns, other rows pan their preview
-    readonly property bool scrollsKarousel: overviewRoot.karouselAvailable && desktop !== null && desktop === overviewRoot.activeDesktop
+    readonly property bool scrollsKarousel: overviewRoot.karousel.available && desktop !== null && desktop === overviewRoot.activeDesktop
     // Karousel's view is being moved to match the preview, the thumbnails stay where they are until it's done
     property bool syncingScroll: false
     // the thumbnails don't animate their movement, stays on a bit after the sync so that they don't animate its end
@@ -79,26 +81,7 @@ Item {
     property real minimizedEnd: 0
 
     Accessible.role: Accessible.List
-    Accessible.name: desktop !== null ? desktop.name : "New desktop"
-
-    function startRenaming() {
-        editingName = true;
-        nameInput.text = desktop.name;
-        nameInput.forceActiveFocus();
-        nameInput.selectAll();
-    }
-
-    function finishRenaming(apply) {
-        if (!editingName) {
-            return;
-        }
-        editingName = false;
-        const name = nameInput.text.trim();
-        if (apply && name !== "") {
-            desktop.name = name;
-        }
-        overviewRoot.forceActiveFocus();
-    }
+    Accessible.name: desktop !== null ? desktop.name : I18n.tr("New desktop")
 
     function toStripX(x) {
         return (x - stripMinX) * thumbScale + padding;
@@ -156,23 +139,36 @@ Item {
 
     // Karousel's columns on this desktop, from all of its windows, also those hidden by the search, without the
     // floating ones, so that the indexes match Karousel's when driving it through its key bindings
+    // while a dragged window works out what's under it, the columns and windows are worked out once, see
+    // DragController.refresh
+    function cacheColumns(on) {
+        cachedColumns = null;
+        cachedWindows = null;
+        caching = on;
+    }
+    property bool caching: false
+    property var cachedColumns: null
+    property var cachedWindows: null
+
     function karouselColumns() {
+        if (caching) {
+            if (cachedColumns === null) {
+                cachedColumns = computeKarouselColumns();
+            }
+            return cachedColumns;
+        }
+        return computeKarouselColumns();
+    }
+
+    function computeKarouselColumns() {
         if (desktop === null) {
             return [];
         }
         const area = KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, overviewRoot.targetScreen, desktop);
         return Layout.computeColumns(karouselWindows().map(window => ({ window: window, geometry: overviewRoot.geometryOf(window) })))
-            .filter(column => isTiledColumn(column, area));
+            .filter(column => Layout.isTiledColumn(column, area, Kirigami.Units.gridUnit * 4));
     }
 
-    // whether Karousel tiles a column, which then starts at the top of the desktop's area and reaches its bottom, or at
-    // least more than half of its height for windows that can't be as tall; it limits windows to half of that height
-    // when they start floating
-    function isTiledColumn(column, area) {
-        const tolerance = Kirigami.Units.gridUnit * 4;
-        return column.y <= area.y + tolerance
-            && (column.bottom >= area.y + area.height - tolerance || column.bottom - column.y > area.height * 0.55);
-    }
 
     // a window dropped here can be put at a place among the columns: it's on this desktop, or this desktop is the current
     // one, which Karousel lays out, a window from another one is moved here first
@@ -192,6 +188,16 @@ Item {
     }
 
     function karouselWindows() {
+        if (caching) {
+            if (cachedWindows === null) {
+                cachedWindows = computeKarouselWindows();
+            }
+            return cachedWindows;
+        }
+        return computeKarouselWindows();
+    }
+
+    function computeKarouselWindows() {
         const activity = KWinComponents.Workspace.currentActivity;
         return KWinComponents.Workspace.windows
             .filter(window => window.normalWindow && !window.minimized
@@ -264,7 +270,7 @@ Item {
     function columnDrop(window, overviewX, wholeColumn) {
         const allColumns = karouselColumns();
         // -1 for a floating window or one from another desktop, which gets tiled there
-        const source = allColumns.findIndex(column => column.windows.includes(window));
+        const source = Layout.columnIndex(allColumns, window);
         if (source === -1 && !arrives(window)) {
             return null;
         }
@@ -284,18 +290,18 @@ Item {
             return;
         }
         if (drop.expel !== null) {
-            overviewRoot.moveWindow(window, drop.expel);
+            overviewRoot.karousel.moveWindow(window, drop.expel);
         } else if (drop.source === -1) {
             // tiled next to the last focused column first, then moved among the others
             const target = drop.target;
-            overviewRoot.bringThen(window, row, () => {
+            overviewRoot.karousel.bringThen(window, row, () => {
                 const source = karouselColumns().findIndex(column => column.windows.includes(window));
                 if (source !== -1 && target !== source) {
-                    overviewRoot.moveColumn(window, target - source);
+                    overviewRoot.karousel.moveColumn(window, target - source);
                 }
             });
         } else if (drop.target !== drop.source) {
-            overviewRoot.moveColumn(window, drop.target - drop.source);
+            overviewRoot.karousel.moveColumn(window, drop.target - drop.source);
         }
     }
 
@@ -323,8 +329,8 @@ Item {
         stackHint = null;
         moveHint = false;
         const columns = karouselColumns();
-        const source = columns.findIndex(column => column.windows.includes(window));
-        const target = columns.findIndex(column => column.windows.includes(tileWindow));
+        const source = Layout.columnIndex(columns, window);
+        const target = Layout.columnIndex(columns, tileWindow);
         const floating = source === -1 && arrives(window);
         if (target === -1 || (!floating && (source === -1 || Layout.tileMoves(columns.map((column, i) => wholeColumn && i === source ? 1 : column.windows.length), source, target, side).length === 0))) {
             hideInsertHint();
@@ -366,8 +372,8 @@ Item {
     // targetWindow in its column, and that column, which ends up stacked or not; null when it's already like that
     function stackPlan(window, targetWindow, side, stacked) {
         const columns = karouselColumns();
-        const source = columns.findIndex(column => column.windows.includes(window));
-        const target = columns.findIndex(column => column.windows.includes(targetWindow));
+        const source = Layout.columnIndex(columns, window);
+        const target = Layout.columnIndex(columns, targetWindow);
         if (target === -1 || (source === -1 && !arrives(window))) {
             return null;
         }
@@ -487,15 +493,14 @@ Item {
             glideToViewport();
             return;
         }
-        const closest = x => lefts.reduce((best, left, i) => Math.abs(left - x) < Math.abs(lefts[best] - x) ? i : best, 0);
-        const steps = closest(viewportFrame.x) - closest(flick.contentX + viewportLeft);
+        const steps = Layout.scrollSteps(lefts, flick.contentX + viewportLeft, viewportFrame.x);
         if (steps === 0) {
             glideToViewport();
             return;
         }
         // Karousel's shortcuts go through D-Bus and it moves the windows one by one
         startKarouselSync(Kirigami.Units.longDuration * 2, Kirigami.Units.longDuration * 2);
-        overviewRoot.scrollKarousel(steps);
+        overviewRoot.karousel.scroll(steps);
     }
 
     // keeps the thumbnails where they are while Karousel moves the windows, until no window has moved for settleInterval,
@@ -539,7 +544,7 @@ Item {
         const centered = !center || isCentered(window);
         overviewRoot.focusWindow(window);
         if (syncs && !centered) {
-            overviewRoot.invokeKarousel([Layout.KarouselShortcuts.scrollFocused]);
+            overviewRoot.karousel.invoke([Layout.KarouselShortcuts.scrollFocused]);
         }
     }
 
@@ -801,7 +806,7 @@ Item {
         width: row.width
         height: row.height
         visible: row.desktop !== null && row.moveHint
-        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.25)
+        color: row.style.highlightAlpha(0.25)
         border.width: 3
         border.color: Kirigami.Theme.highlightColor
         radius: Kirigami.Units.cornerRadius
@@ -872,7 +877,7 @@ Item {
         width: row.cardWidth
         height: row.height
         visible: row.desktop === null && row.moveHint
-        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.25)
+        color: row.style.highlightAlpha(0.25)
         border.width: 3
         border.color: Kirigami.Theme.highlightColor
         radius: row.wallpaperRadius
@@ -902,7 +907,7 @@ Item {
             height: flick.contentHeight
 
             TapHandler {
-                onTapped: row.overviewRoot.switchToDesktop(row.desktop)
+                onTapped: row.overviewRoot.desktopActions.switchToDesktop(row.desktop)
             }
         }
 
@@ -916,7 +921,7 @@ Item {
 
         // frames around columns with more than one window
         Repeater {
-            model: row.columns.filter(column => column.windows.length > 1)
+            model: row.sharedColumns
 
             Rectangle {
                 required property var modelData
@@ -936,214 +941,15 @@ Item {
         // above each column with more than one window: a handle to drag the whole column by, and a button between
         // Karousel's stacked layout and the windows one under another
         Repeater {
-            model: row.columns.filter(column => column.windows.length > 1)
+            model: row.sharedColumns
 
-            Item {
-                id: columnBar
-
-                required property var modelData
-                readonly property bool dragged: row.overviewRoot.draggedWindows.some(window => modelData.windows.includes(window))
-                readonly property bool stacked: row.isStackedColumn(modelData)
-                readonly property bool lit: gripHover.hovered || gripDrag.active
-
-                x: row.toStripX(modelData.x)
-                // right above the column's frame
-                y: (modelData.y - row.screenGeometry.y) * row.thumbScale - Kirigami.Units.smallSpacing - height
-                z: 100000
-                width: modelData.width * row.thumbScale
-                height: Kirigami.Units.gridUnit * 1.5
-                opacity: (row.overviewRoot.draggedWindow === null || dragged ? 1 : 0) * row.overviewRoot.zoom
-                visible: opacity > 0
-
-                // Karousel rearranging recreates them, the drag would never end without the DragHandler that tracks it
-                Component.onDestruction: {
-                    if (gripDrag.active) {
-                        row.overviewRoot.cancelDrag();
-                    }
-                }
-
-                // a pill with two rows of three dots, the usual sign for something to drag, on the frame's top edge,
-                // floating like the windows
-                Kirigami.ShadowedRectangle {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.bottom
-                    // roomy around the dots, the whole pill grabs
-                    width: Kirigami.Units.gridUnit * 3.5
-                    height: Kirigami.Units.gridUnit * 1.4
-                    radius: height / 2
-                    color: columnBar.lit ? Kirigami.Theme.highlightColor : Kirigami.Theme.backgroundColor
-                    border.width: 1
-                    border.color: columnBar.lit ? Kirigami.Theme.highlightColor : row.style.foregroundAlpha(0.2)
-                    shadow.size: Kirigami.Units.gridUnit * (columnBar.lit ? 1 : 0.6)
-                    shadow.yOffset: Kirigami.Units.smallSpacing / 2
-                    shadow.color: columnBar.lit ? Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.6)
-                        : Qt.rgba(0, 0, 0, 0.3)
-
-                    Accessible.role: Accessible.Grip
-                    Accessible.name: "Move column"
-
-                    Behavior on color {
-                        ColorAnimation { duration: Kirigami.Units.shortDuration }
-                    }
-
-                    Grid {
-                        anchors.centerIn: parent
-                        rows: 2
-                        columns: 3
-                        spacing: Math.round(Kirigami.Units.smallSpacing * 0.75)
-
-                        Repeater {
-                            model: 6
-
-                            Rectangle {
-                                width: Math.round(Kirigami.Units.smallSpacing * 0.9)
-                                height: width
-                                radius: width / 2
-                                color: columnBar.lit ? Kirigami.Theme.highlightedTextColor : Kirigami.Theme.textColor
-                                opacity: columnBar.lit ? 1 : 0.55
-                            }
-                        }
-                    }
-
-                    HoverHandler {
-                        id: gripHover
-                        cursorShape: Qt.SizeAllCursor
-                    }
-
-                    DragHandler {
-                        id: gripDrag
-                        target: null
-                        // don't let the Flickables steal the drag
-                        grabPermissions: PointerHandler.CanTakeOverFromAnything
-                        onActiveChanged: {
-                            const windows = columnBar.modelData.windows;
-                            if (active) {
-                                row.overviewRoot.startDrag(windows[0], row.thumbForWindow(windows[0]), centroid.scenePressPosition, windows);
-                            } else {
-                                row.overviewRoot.endDrag();
-                            }
-                        }
-                        onCentroidChanged: {
-                            if (active) {
-                                row.overviewRoot.moveDrag(centroid.scenePosition);
-                            }
-                        }
-                    }
-                }
-
-                // stacked or one under another, with what clicking makes of it; in the column's top left corner,
-                // the windows' own buttons are on the right
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.top: parent.bottom
-                    anchors.margins: Kirigami.Units.smallSpacing * 2
-                    width: layoutLabel.implicitWidth + 2 * Kirigami.Units.largeSpacing
-                    height: Kirigami.Units.iconSizes.smallMedium + Kirigami.Units.smallSpacing
-                    radius: height / 2
-                    color: layoutHover.hovered ? Kirigami.Theme.highlightColor : Qt.rgba(0, 0, 0, 0.7)
-                    visible: row.overviewRoot.draggedWindow === null
-
-                    Accessible.role: Accessible.Button
-                    Accessible.name: layoutText.text
-
-                    Row {
-                        id: layoutLabel
-                        anchors.centerIn: parent
-                        spacing: Kirigami.Units.smallSpacing
-
-                        Kirigami.Icon {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: Kirigami.Units.iconSizes.small
-                            height: width
-                            source: columnBar.stacked ? "view-split-top-bottom" : "window-duplicate"
-                            color: "white"
-                            isMask: true
-                        }
-
-                        Text {
-                            id: layoutText
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: columnBar.stacked ? "Unstack" : "Stack"
-                            color: "white"
-                        }
-                    }
-
-                    HoverHandler {
-                        id: layoutHover
-                    }
-
-                    TapHandler {
-                        gesturePolicy: TapHandler.WithinBounds
-                        onTapped: row.overviewRoot.toggleStacked(columnBar.modelData.windows[0])
-                    }
-                }
+            ColumnBar {
+                strip: row
             }
         }
 
-        // the column a dragged window would join
-        Rectangle {
-            x: row.stackHint !== null ? row.stackHint.x : 0
-            y: row.stackHint !== null ? row.stackHint.y : 0
-            width: row.stackHint !== null ? row.stackHint.width : 0
-            height: row.stackHint !== null ? row.stackHint.height : 0
-            z: 100000
-            radius: Kirigami.Units.cornerRadius
-            color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.3)
-            border.width: 3
-            border.color: Kirigami.Theme.highlightColor
-            visible: row.stackHint !== null
-        }
-
-        // where in that column, a glowing pill like the one between columns
-        Kirigami.ShadowedRectangle {
-            x: row.stackHint !== null ? row.stackHint.x + row.stackHint.width * 0.1 : 0
-            y: row.stackHint !== null && !isNaN(row.stackHint.lineY) ? row.stackHint.lineY - height / 2 : 0
-            z: 100000
-            width: row.stackHint !== null ? row.stackHint.width * 0.8 : 0
-            height: Kirigami.Units.smallSpacing * 2.5
-            radius: height / 2
-            color: Kirigami.Theme.highlightColor
-            shadow.size: Kirigami.Units.gridUnit * 1.5
-            shadow.color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.9)
-            visible: row.stackHint !== null && !isNaN(row.stackHint.lineY)
-        }
-
-        // where a dragged column goes: a glowing pill that slides between the columns and fades in and out
-        Kirigami.ShadowedRectangle {
-            id: insertHint
-
-            readonly property bool shown: !isNaN(row.insertHintX)
-            // stays where it was while fading out
-            property real hintX: 0
-
-            x: hintX - width / 2
-            y: row.height * 0.1
-            z: 100000
-            width: Kirigami.Units.smallSpacing * 2.5
-            height: row.height * 0.8
-            radius: width / 2
-            color: Kirigami.Theme.highlightColor
-            shadow.size: Kirigami.Units.gridUnit * 1.5
-            shadow.color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.9)
-            opacity: shown ? 1 : 0
-            visible: opacity > 0
-
-            Connections {
-                target: row
-                function onInsertHintXChanged() {
-                    if (!isNaN(row.insertHintX)) {
-                        insertHint.hintX = row.insertHintX;
-                    }
-                }
-            }
-
-            Behavior on opacity {
-                NumberAnimation { duration: Kirigami.Units.shortDuration }
-            }
-            Behavior on hintX {
-                enabled: insertHint.shown
-                NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic }
-            }
+        DropHints {
+            strip: row
         }
 
         Repeater {
@@ -1241,116 +1047,8 @@ Item {
         }
     }
 
-    // a pill on the wallpaper's top-left corner with the desktop's number and name, double-click to rename,
-    // and a button to remove the desktop when it's empty; on the wallpaper, so in the wallpaper's colours
-    Rectangle {
-        id: pill
-
-        // the default name, a word and the number in any language, only repeats the number
-        readonly property bool showName: row.desktop === null || row.editingName || !new RegExp("^\\S+\\s" + row.number + "$").test(row.desktop.name)
-
-        // across the wallpaper's top edge, so that it covers little of the windows
-        x: row.cardLeft + Kirigami.Units.smallSpacing
-        y: -height / 2
-        width: header.implicitWidth + 2 * (showName ? Kirigami.Units.largeSpacing : Kirigami.Units.smallSpacing)
-        height: header.implicitHeight + 2 * Kirigami.Units.smallSpacing
-        radius: height / 2
-        color: Qt.rgba(0, 0, 0, row.selected ? 0.75 : 0.55)
-        border.width: row.selected ? 1 : 0
-        border.color: Kirigami.Theme.highlightColor
-        opacity: row.overviewRoot.zoom
-
-        HoverHandler {
-            id: headerHover
-        }
-
-        // takes the clicks for itself, so that clicking the pill doesn't switch desktops or close the overview
-        TapHandler {
-            gesturePolicy: TapHandler.WithinBounds
-            onDoubleTapped: {
-                if (row.desktop !== null) {
-                    row.startRenaming();
-                }
-            }
-        }
-
-        Row {
-            id: header
-            anchors.centerIn: parent
-            spacing: Kirigami.Units.smallSpacing
-
-            Rectangle {
-                anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(Kirigami.Units.iconSizes.small, numberLabel.implicitWidth + Kirigami.Units.smallSpacing)
-                height: Kirigami.Units.iconSizes.small
-                radius: height / 2
-                color: row.selected ? Kirigami.Theme.highlightColor : Qt.rgba(1, 1, 1, 0.25)
-
-                Text {
-                    id: numberLabel
-                    anchors.centerIn: parent
-                    text: row.desktop !== null ? row.number : "+"
-                    color: "white"
-                    font.bold: true
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
-                }
-            }
-
-            Text {
-                id: nameLabel
-                anchors.verticalCenter: parent.verticalCenter
-                visible: !row.editingName && pill.showName
-                text: row.desktop !== null ? row.desktop.name : "New desktop"
-                font: Kirigami.Theme.defaultFont
-                color: "white"
-                opacity: row.selected ? 1 : 0.8
-            }
-
-            TextInput {
-                id: nameInput
-                anchors.verticalCenter: parent.verticalCenter
-                visible: row.editingName
-                font: nameLabel.font
-                color: "white"
-                selectByMouse: true
-                selectionColor: Kirigami.Theme.highlightColor
-                onAccepted: row.finishRenaming(true)
-                onActiveFocusChanged: {
-                    if (!activeFocus) {
-                        row.finishRenaming(true);
-                    }
-                }
-                Keys.onEscapePressed: row.finishRenaming(false)
-            }
-
-            Rectangle {
-                anchors.verticalCenter: parent.verticalCenter
-                width: Kirigami.Units.iconSizes.small
-                height: width
-                radius: width / 2
-                color: removeHover.hovered ? "#da4453" : Qt.rgba(1, 1, 1, 0.2)
-                // the window count is filtered by the search, so don't offer removing while searching
-                // windowCount only to be checked again as windows come and go
-                visible: headerHover.hovered && !row.editingName && row.desktop !== null && row.windowCount >= 0 && row.isEmpty()
-                         && row.overviewRoot.searchText === "" && KWinComponents.Workspace.desktops.length > 1
-
-                Text {
-                    anchors.centerIn: parent
-                    text: "✕"
-                    color: "white"
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
-                }
-
-                HoverHandler {
-                    id: removeHover
-                }
-
-                TapHandler {
-                    gesturePolicy: TapHandler.WithinBounds
-                    onTapped: KWinComponents.Workspace.removeDesktop(row.desktop)
-                }
-            }
-        }
+    DesktopPill {
+        strip: row
     }
 
     Component.onCompleted: {

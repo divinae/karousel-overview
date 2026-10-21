@@ -14,7 +14,7 @@ jobs:
     container: archlinux:latest
     steps:
       - name: Install dependencies
-        run: pacman -Syu --noconfirm --needed git make nodejs qt6-declarative qt6-shadertools qt6-5compat kirigami milou libplasma github-cli
+        run: pacman -Syu --noconfirm --needed git make nodejs qt6-declarative qt6-shadertools qt6-5compat kirigami milou libplasma gettext github-cli
       - uses: actions/checkout@v4
       - name: Tag matches the package's version
         run: |

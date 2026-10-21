@@ -139,6 +139,54 @@ function stackMoves(columnSizes, source, target) {
     return moves;
 }
 
+// the index of the column with the window in it, -1 when none has it
+function columnIndex(columns, window) {
+    return columns.findIndex(column => column.windows.includes(window));
+}
+
+// whether Karousel tiles a column, which then starts at the top of the desktop's area and reaches its bottom, or at
+// least more than half of its height for windows that can't be as tall; Karousel limits windows to half of that height
+// when they start floating
+function isTiledColumn(column, area, tolerance) {
+    return column.y <= area.y + tolerance
+        && (column.bottom >= area.y + area.height - tolerance || column.bottom - column.y > area.height * 0.55);
+}
+
+// where a window dropped onto another one goes, from the pointer's offset from that window's middle in fractions of
+// its size: its left or right quarter gives it a column of its own beside it ("tile"), of the rest the top and bottom
+// fifths put it above or below it in its column ("beside"), the middle stacks them ("stack") when canStack, otherwise
+// it's the top or bottom half; side is -1 for left or above, 1 for right or below
+function dropZone(dx, dy, canStack) {
+    if (Math.abs(dx) > 0.25) {
+        return { kind: "tile", side: dx < 0 ? -1 : 1 };
+    }
+    if (Math.abs(dy) > 0.3 || !canStack) {
+        return { kind: "beside", side: dy < 0 ? -1 : 1 };
+    }
+    return { kind: "stack", side: 1 };
+}
+
+// how many columns Karousel's view has to scroll so that the column closest to targetX is where the one closest to
+// viewX is now, positive to the left; columnLefts in the same coordinates
+function scrollSteps(columnLefts, viewX, targetX) {
+    const closest = x => columnLefts.reduce((best, left, i) => Math.abs(left - x) < Math.abs(columnLefts[best] - x) ? i : best, 0);
+    return closest(targetX) - closest(viewX);
+}
+
+// where a column width wide goes at the end of a desktop's strip, as Karousel puts it, its others the rects of the
+// windows there: after the last one, and as tall as they are, or in the middle of an empty desktop's area
+function placeAtEnd(others, area, width, gap) {
+    if (others.length === 0) {
+        return { x: area.x + (area.width - width) / 2, y: area.y, height: area.height };
+    }
+    const top = Math.min(...others.map(other => other.y));
+    return {
+        x: Math.max(...others.map(other => other.x + other.width)) + gap,
+        y: top,
+        height: Math.max(...others.map(other => other.y + other.height)) - top,
+    };
+}
+
 // whether a column's windows, given from top to bottom, are in Karousel's stacked layout, where they overlap
 function isStacked(geometries) {
     for (let i = 1; i < geometries.length; i++) {

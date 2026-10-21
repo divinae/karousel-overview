@@ -4,6 +4,7 @@ import QtQuick
 import Qt5Compat.GraphicalEffects
 import org.kde.kirigami as Kirigami
 import org.kde.kwin as KWinComponents
+import "i18n.js" as I18n
 
 Item {
     id: thumb
@@ -141,7 +142,7 @@ Item {
         width: zone === "left" || zone === "right" ? parent.width / 2 : parent.width - 2 * inset
         height: zone === "top" || zone === "bottom" ? parent.height / 2 : parent.height - 2 * inset
         radius: thumb.overviewRoot.windowRadius
-        color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.4)
+        color: thumb.overviewRoot.style.highlightAlpha(0.4)
         border.width: 2
         border.color: Kirigami.Theme.highlightColor
         visible: zone !== ""
@@ -213,7 +214,7 @@ Item {
         visible: thumb.showControls && thumb.window.closeable
 
         Accessible.role: Accessible.Button
-        Accessible.name: "Close"
+        Accessible.name: I18n.trc("@action:button a window", "Close")
 
         Text {
             anchors.centerIn: parent
@@ -241,10 +242,10 @@ Item {
         height: width
         radius: width / 2
         color: floatHover.hovered ? Kirigami.Theme.highlightColor : Qt.rgba(0, 0, 0, 0.7)
-        visible: thumb.showControls && thumb.overviewRoot.karouselAvailable
+        visible: thumb.showControls && thumb.overviewRoot.karousel.available
 
         Accessible.role: Accessible.Button
-        Accessible.name: "Toggle floating"
+        Accessible.name: I18n.tr("Toggle floating")
 
         Kirigami.Icon {
             anchors.centerIn: parent
@@ -261,7 +262,7 @@ Item {
 
         TapHandler {
             gesturePolicy: TapHandler.WithinBounds
-            onTapped: thumb.overviewRoot.toggleFloating(thumb.window)
+            onTapped: thumb.overviewRoot.karousel.toggleFloating(thumb.window)
         }
     }
 

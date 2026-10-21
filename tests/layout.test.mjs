@@ -7,7 +7,7 @@ import vm from "node:vm";
 const source = readFileSync(new URL("../package/contents/ui/layout.js", import.meta.url), "utf8")
     .replace(/^\.pragma library$/m, "");
 const Layout = {};
-vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, stackBesideMoves, isStacked, expelMoves, tileMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
+vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, stackBesideMoves, isStacked, expelMoves, columnIndex, isTiledColumn, dropZone, scrollSteps, placeAtEnd, tileMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
 
 const rect = (x, y, width, height) => ({ x, y, width, height });
 // objects from the vm context have that context's prototypes, which deepEqual tells apart
@@ -176,6 +176,11 @@ test("Karousel shortcut names match Karousel's key bindings", () => {
     assert.equal(Layout.KarouselShortcuts.scrollLeftColumn, "karousel-grid-scroll-left-column");
     assert.equal(Layout.KarouselShortcuts.scrollRightColumn, "karousel-grid-scroll-right-column");
     assert.equal(Layout.KarouselShortcuts.scrollFocused, "karousel-grid-scroll-focused");
+    assert.equal(Layout.KarouselShortcuts.windowMoveUp, "karousel-window-move-up");
+    assert.equal(Layout.KarouselShortcuts.windowMoveDown, "karousel-window-move-down");
+    assert.equal(Layout.KarouselShortcuts.columnToggleStacked, "karousel-column-toggle-stacked");
+    assert.equal(Layout.KarouselShortcuts.windowToggleFloating, "karousel-window-toggle-floating");
+    assert.equal(Layout.KarouselShortcuts.columnMoveToDesktop + 3, "karousel-column-move-to-desktop-3");
 });
 
 test("emptyDesktops leaves out desktops with windows and kept ones", () => {
@@ -246,4 +251,62 @@ test("expelMoves takes the window out of its column to where it's dropped", () =
     assert.deepEqual(plain(Layout.expelMoves(1, 1)), [S.windowMoveRight, S.columnMoveLeft]);
     assert.deepEqual(plain(Layout.expelMoves(0, 3)), [S.windowMoveRight, S.columnMoveRight, S.columnMoveRight]);
     assert.deepEqual(plain(Layout.expelMoves(1, 0)), [S.windowMoveRight, S.columnMoveLeft, S.columnMoveLeft]);
+});
+
+test("columnIndex finds the column with the window", () => {
+    const columns = [{ windows: ["a"] }, { windows: ["b", "c"] }];
+    assert.equal(Layout.columnIndex(columns, "c"), 1);
+    assert.equal(Layout.columnIndex(columns, "d"), -1);
+});
+
+test("isTiledColumn tells tiled columns from floating windows", () => {
+    const area = rect(0, 0, 1920, 1080);
+    // full height, with gaps
+    assert.equal(Layout.isTiledColumn({ y: 6, bottom: 1074 }, area, 72), true);
+    // a window that can't be as tall, but more than half
+    assert.equal(Layout.isTiledColumn({ y: 6, bottom: 700 }, area, 72), true);
+    // floating, limited to half of the height
+    assert.equal(Layout.isTiledColumn({ y: 6, bottom: 540 }, area, 72), false);
+    assert.equal(Layout.isTiledColumn({ y: 300, bottom: 1074 }, area, 72), false);
+});
+
+test("dropZone splits a window into sides, top and bottom, and middle", () => {
+    assert.deepEqual(plain(Layout.dropZone(-0.4, 0, true)), { kind: "tile", side: -1 });
+    assert.deepEqual(plain(Layout.dropZone(0.3, -0.45, true)), { kind: "tile", side: 1 });
+    assert.deepEqual(plain(Layout.dropZone(0, -0.4, true)), { kind: "beside", side: -1 });
+    assert.deepEqual(plain(Layout.dropZone(0.2, 0.35, true)), { kind: "beside", side: 1 });
+    assert.deepEqual(plain(Layout.dropZone(0.1, 0.1, true)), { kind: "stack", side: 1 });
+    // a column that isn't stacked: its halves
+    assert.deepEqual(plain(Layout.dropZone(0.1, -0.1, false)), { kind: "beside", side: -1 });
+    assert.deepEqual(plain(Layout.dropZone(0.1, 0.1, false)), { kind: "beside", side: 1 });
+    // the boundaries belong to the inner zone
+    assert.deepEqual(plain(Layout.dropZone(0.25, 0, true)), { kind: "stack", side: 1 });
+    assert.deepEqual(plain(Layout.dropZone(0, 0.3, true)), { kind: "stack", side: 1 });
+});
+
+test("scrollSteps counts the columns between the view and the target", () => {
+    const lefts = [0, 500, 1000, 1500];
+    assert.equal(Layout.scrollSteps(lefts, 20, 990), 2);
+    assert.equal(Layout.scrollSteps(lefts, 1480, 510), -2);
+    assert.equal(Layout.scrollSteps(lefts, 700, 600), 0);
+});
+
+test("placeAtEnd puts a column after the others and as tall, or in the middle of an empty desktop", () => {
+    const area = rect(0, 0, 1920, 1080);
+    assert.deepEqual(plain(Layout.placeAtEnd([], area, 800, 10)), { x: 560, y: 0, height: 1080 });
+    assert.deepEqual(plain(Layout.placeAtEnd([rect(6, 6, 800, 520), rect(6, 536, 800, 538), rect(816, 6, 900, 1068)], area, 600, 10)),
+        { x: 1726, y: 6, height: 1068 });
+});
+
+test("computeColumns joins windows overlapping by at least 80% of the wider one", () => {
+    const join = Layout.computeColumns([
+        { window: "a", geometry: rect(0, 0, 1000, 500) },
+        { window: "b", geometry: rect(200, 510, 1000, 500) },
+    ]);
+    assert.equal(join.length, 1);
+    const apart = Layout.computeColumns([
+        { window: "a", geometry: rect(0, 0, 1000, 500) },
+        { window: "b", geometry: rect(201, 510, 1000, 500) },
+    ]);
+    assert.equal(apart.length, 2);
 });

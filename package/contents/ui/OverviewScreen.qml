@@ -35,17 +35,24 @@ Item {
     readonly property real verticalGap: sceneEffect.verticalGap >= 0 ? sceneEffect.verticalGap : horizontalGap
     property var selectedWindow: null
     readonly property var draggedWindow: dragController.window
+    // what moves the rows or the minimap under a still pointer, see DragController.dragState
+    readonly property real rowsPosition: rows.contentY
+    readonly property bool minimapShown: minimap.item !== null && (minimap.item as DesktopMinimap).shown
     // the dragged window, or all of its column's when the column is dragged by its handle
     readonly property var draggedWindows: draggedWindow === null ? [] : dragController.wholeColumn ? dragController.columnWindows : [draggedWindow]
     // the window that a dragged window would join the column of
-    readonly property var dropTargetWindow: dropZoneWindow ?? externalDragWindow
+    readonly property var dropTargetWindow: dropZoneWindow ?? externalDragItem.window
     // the window a dragged one would join or tile beside, and where: "center", "top", "bottom", "left" or "right"
     readonly property var dropZoneWindow: dragController.dropAction === "" ? null : dragController.targetWindow ?? dragController.tileWindow
     readonly property string dropZone: dropZoneWindow === null ? ""
         : dragController.targetWindow !== null ? (dragController.stacked ? "center" : dragController.side < 0 ? "top" : "bottom")
         : dragController.side < 0 ? "left" : "right"
-    // whether Karousel's key bindings are there to drive it
-    property bool karouselAvailable: false
+    // driving Karousel, desktops and drops, and drags from apps, see those files
+    readonly property KarouselDriver karousel: karouselDriver
+    readonly property DesktopActions desktopActions: actions
+    readonly property ExternalDrag externalDrag: externalDragItem
+    // the overview zooms into a clicked window once its strip has glided there
+    readonly property bool activating: activationTimer.running
     // the current desktop of this screen, kept up to date
     property var activeDesktop: currentDesktop()
     property string searchText: ""
@@ -69,6 +76,10 @@ Item {
 
         function foregroundAlpha(alpha) {
             return Qt.rgba(foreground.r, foreground.g, foreground.b, alpha);
+        }
+
+        function highlightAlpha(alpha) {
+            return Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, alpha);
         }
     }
 
@@ -126,8 +137,9 @@ Item {
         };
         if (index === desktops.length) {
             const last = desktops[desktops.length - 1];
-            if (KWinComponents.Workspace.windows.some(window => window.desktops.length === 1 && window.desktops[0] === last)) {
-                createDesktop();
+            // its own windows, in the current activity, as its row shows them
+            if (KWinComponents.Workspace.windows.some(window => desktopActions.belongsTo(window, last))) {
+                desktopActions.createDesktop();
                 // after the rows keep showing the row they showed when the count changed, see onCountChanged
                 Qt.callLater(show);
                 return;
@@ -175,28 +187,6 @@ Item {
         return below.index;
     }
 
-    // desktops created here while the setting is on are temporary, removed again once empty, see removeEmptyDesktops
-    function createDesktop(position = KWinComponents.Workspace.desktops.length) {
-        KWinComponents.Workspace.createDesktop(position, "");
-        const desktops = KWinComponents.Workspace.desktops;
-        const desktop = desktops[position];
-        if (overview.config.RemoveEmptyDesktops) {
-            const ids = desktops.map(desktop => desktop.id);
-            overview.sceneEffect.temporaryDesktops = overview.sceneEffect.temporaryDesktops.filter(id => ids.includes(id)).concat([desktop.id]);
-        }
-        return desktop;
-    }
-
-    function switchToDesktop(desktop) {
-        if (desktop === null) {
-            desktop = createDesktop();
-        }
-        if (desktop !== currentDesktop()) {
-            KWinComponents.Workspace.setCurrentDesktopForScreen(desktop, targetScreen);
-        }
-        overview.sceneEffect.deactivate();
-    }
-
     function switchToDesktopKeepingOverview(row) {
         if (row.desktop !== currentDesktop()) {
             KWinComponents.Workspace.setCurrentDesktopForScreen(row.desktop, targetScreen);
@@ -214,76 +204,6 @@ Item {
     // the row that zooms in once its strip has glided to the clicked window, see activateWindow
     property DesktopRow activationRow: null
 
-    // something dragged from an app, e.g. a file: KWin keeps the pointer's events from the overview, only its position
-    // reaches it. Holding it over a window activates that window, to drop it there, over the minimap's card it shows
-    // that desktop's row
-    property bool externalDrag: false
-    property var externalDragWindow: null
-    property int externalDragCard: -1
-
-    function updateExternalDrag() {
-        const cursor = KWinComponents.Workspace.cursorPos;
-        const point = Qt.point(cursor.x - screenGeometry.x, cursor.y - screenGeometry.y);
-        // the pointer's own events would have reached the overview by now, see onCursorPosChanged
-        if (pointerHover.hovered || draggedWindow !== null || !sceneEffect.activated || activationTimer.running
-                || point.x < 0 || point.y < 0 || point.x >= width || point.y >= height) {
-            endExternalDrag();
-            return;
-        }
-        externalDrag = true;
-        const target = externalDragTargetAt(point);
-        if (target.window !== externalDragWindow || target.card !== externalDragCard) {
-            externalDragWindow = target.window;
-            externalDragCard = target.card;
-            externalDragTimer.restart();
-        }
-    }
-
-    // the window or the minimap's card, not the one for a new desktop, under a point
-    function externalDragTargetAt(point) {
-        const index = minimapIndexAt(point);
-        const card = index < KWinComponents.Workspace.desktops.length ? index : -1;
-        return { card: card, window: index === -1 ? thumbAt(point)?.window ?? null : null };
-    }
-
-    function endExternalDrag() {
-        externalDragTimer.stop();
-        externalDrag = false;
-        externalDragWindow = null;
-        externalDragCard = -1;
-    }
-
-    Timer {
-        id: externalDragTimer
-        interval: 600
-        onTriggered: {
-            // what's under the still pointer can have changed meanwhile, e.g. the minimap slid in under it
-            const cursor = KWinComponents.Workspace.cursorPos;
-            const target = overview.externalDragTargetAt(Qt.point(cursor.x - overview.screenGeometry.x, cursor.y - overview.screenGeometry.y));
-            if (target.window !== overview.externalDragWindow || target.card !== overview.externalDragCard) {
-                overview.externalDragWindow = target.window;
-                overview.externalDragCard = target.card;
-                restart();
-                return;
-            }
-            if (overview.externalDragWindow !== null && KWinComponents.Workspace.windows.includes(overview.externalDragWindow)) {
-                const window = overview.externalDragWindow;
-                overview.endExternalDrag();
-                overview.activateWindow(window);
-            } else if (overview.externalDragCard !== -1) {
-                overview.goToRow(overview.externalDragCard);
-            }
-        }
-    }
-
-    HoverHandler {
-        id: pointerHover
-        onHoveredChanged: {
-            if (hovered) {
-                overview.endExternalDrag();
-            }
-        }
-    }
     property real activationStart: 0
 
     function activateWindow(window) {
@@ -328,186 +248,8 @@ Item {
         } else if (selectedWindow !== null && row.hasWindow(selectedWindow)) {
             activateWindow(selectedWindow);
         } else {
-            switchToDesktop(row.desktop);
+            desktopActions.switchToDesktop(row.desktop);
         }
-    }
-
-    // Karousel doesn't expose any API, so it's driven through its key bindings, which act on the focused window
-    function invokeKarousel(shortcuts) {
-        for (const shortcut of shortcuts) {
-            invokeShortcut.arguments = [shortcut];
-            invokeShortcut.call();
-        }
-    }
-
-    function moveColumn(window, delta) {
-        focusWindow(window);
-        invokeKarousel(Layout.repeat(delta < 0 ? Layout.KarouselShortcuts.columnMoveLeft : Layout.KarouselShortcuts.columnMoveRight, Math.abs(delta)));
-        selectedWindow = window;
-    }
-
-    // moves a window into the column of another window on the same desktop, above it for side -1 or below for 1,
-    // and gives that column Karousel's stacked layout or not
-    function stackWindow(window, targetWindow, side, stacked, row, checkLayout = true) {
-        const plan = row.stackPlan(window, targetWindow, side, stacked);
-        if (plan === null) {
-            return;
-        }
-        if (plan.moves === null) {
-            bringThen(window, row, () => stackWindow(window, targetWindow, side, stacked, row, checkLayout));
-            return;
-        }
-        focusWindow(window);
-        invokeKarousel(plan.moves);
-        selectedWindow = window;
-        if (!checkLayout) {
-            return;
-        }
-        // a column that gets a second window has Karousel's default layout, which can't be read, so check it once
-        // Karousel has laid it out, and switch it if it isn't the wanted one
-        const joined = () => row.karouselColumns().find(column => column.windows.includes(window) && column.windows.includes(targetWindow));
-        waitThen(row, () => joined() !== undefined, () => {
-            const column = joined();
-            if (column !== undefined && row.isStackedColumn(column) !== stacked) {
-                focusWindow(window);
-                invokeKarousel([Layout.KarouselShortcuts.columnToggleStacked]);
-            }
-        });
-    }
-
-
-    // between Karousel's stacked layout for the window's column and its windows one under another
-    function toggleStacked(window) {
-        focusWindow(window);
-        invokeKarousel([Layout.KarouselShortcuts.columnToggleStacked]);
-        selectedWindow = window;
-    }
-
-    // a floating window, or one from another desktop, dropped at a place among the row's columns: Karousel tiles it
-    // first, next to the last focused column, then action moves it from there once Karousel has laid it out
-    function bringThen(window, row, action) {
-        // floating on its own desktop, it floats here too until Karousel tiles it again
-        const home = window.desktops.length === 1 ? rowForDesktop(window.desktops[0]) : null;
-        const floating = home !== null && home.isFloating(window);
-        if (!row.hasWindow(window)) {
-            moveWindowToDesktop(window, row.desktop);
-        }
-        if (floating) {
-            toggleFloating(window);
-        }
-        waitThen(row, () => row.karouselColumns().some(column => column.windows.includes(window)), action);
-    }
-
-    // runs action once ready returns true and the row's columns have stopped moving, Karousel is done then;
-    // several can wait at once, e.g. a column merging while another window is dropped
-    function waitThen(row, ready, action) {
-        waitChecks.push({ row: row, ready: ready, action: action, signature: "", ticks: 0 });
-        waitTimer.start();
-    }
-
-    property var waitChecks: []
-
-    Timer {
-        id: waitTimer
-        interval: 150
-        repeat: true
-        onTriggered: {
-            const checks = overview.waitChecks;
-            overview.waitChecks = [];
-            const done = [];
-            for (const check of checks) {
-                // Karousel's key bindings go through D-Bus, give it a few seconds
-                if (++check.ticks > 40) {
-                    continue;
-                }
-                if (!check.ready()) {
-                    overview.waitChecks.push(check);
-                    continue;
-                }
-                // the same for two checks in a row, when Karousel is done
-                const signature = JSON.stringify(check.row.karouselColumns().map(column => [column.x, column.width, column.y, column.bottom, column.windows.length]));
-                if (signature !== check.signature) {
-                    check.signature = signature;
-                    overview.waitChecks.push(check);
-                    continue;
-                }
-                done.push(check);
-            }
-            if (overview.waitChecks.length === 0) {
-                stop();
-            }
-            // after the list is settled, the actions can wait again
-            for (const check of done) {
-                check.action();
-            }
-        }
-    }
-
-    // runs Karousel key bindings for a window
-    function moveWindow(window, moves) {
-        focusWindow(window);
-        invokeKarousel(moves);
-        selectedWindow = window;
-    }
-
-    // lets Karousel stop tiling a window, or tile it again
-    function toggleFloating(window) {
-        focusWindow(window);
-        invokeKarousel([Layout.KarouselShortcuts.windowToggleFloating]);
-        selectedWindow = window;
-    }
-
-    // a whole column, its windows given from top to bottom, dropped onto a window: they join that window's column one
-    // after another, the first above or below it, the others below the one before, once Karousel has placed that one
-    function mergeColumn(windows, targetWindow, side, stacked, row) {
-        const step = (index, anchor, anchorSide) => {
-            const window = windows[index];
-            const last = index === windows.length - 1;
-            stackWindow(window, anchor, anchorSide, stacked, row, last);
-            if (!last) {
-                waitThen(row, () => row.karouselColumns().some(column => column.windows.includes(window) && column.windows.includes(anchor)),
-                         () => step(index + 1, window, 1));
-            }
-        };
-        if (windows.length > 0) {
-            step(0, targetWindow, side);
-        }
-    }
-
-    // moves a whole column beside another window's column, side -1 left or 1 right
-    function tileColumn(window, targetWindow, side, row) {
-        const columns = row.karouselColumns();
-        const source = columns.findIndex(column => column.windows.includes(window));
-        const target = columns.findIndex(column => column.windows.includes(targetWindow));
-        const moves = source === -1 || target === -1 ? []
-            : Layout.tileMoves(columns.map((column, i) => i === source ? 1 : column.windows.length), source, target, side);
-        if (moves.length > 0) {
-            moveWindow(window, moves);
-        }
-    }
-
-    // moves a window into a column of its own beside another window's column on the same desktop, side -1 left or 1 right
-    function tileWindow(window, targetWindow, side, row) {
-        if (row.arrives(window)) {
-            bringThen(window, row, () => tileWindow(window, targetWindow, side, row));
-            return;
-        }
-        const columns = row.karouselColumns();
-        const source = columns.findIndex(column => column.windows.includes(window));
-        const target = columns.findIndex(column => column.windows.includes(targetWindow));
-        const moves = source === -1 || target === -1 ? [] : Layout.tileMoves(columns.map(column => column.windows.length), source, target, side);
-        // already there, the column stays too
-        if (moves.length === 0) {
-            return;
-        }
-        focusWindow(window);
-        invokeKarousel(moves);
-        selectedWindow = window;
-    }
-
-    // scrolls Karousel's view of the current desktop by whole columns, positive to the left
-    function scrollKarousel(columns) {
-        invokeKarousel(Layout.repeat(columns > 0 ? Layout.KarouselShortcuts.scrollLeftColumn : Layout.KarouselShortcuts.scrollRightColumn, Math.abs(columns)));
     }
 
     // when the user last moved to another row, KWin's answers to the focus changes on the way come later, see
@@ -561,125 +303,6 @@ Item {
         dragController.cancel();
     }
 
-    function dropWindow(window, position, dropX, targetWindow, tileWith, side, stacked, wholeColumn, minimapIndex) {
-        // a whole column dragged by its grip moves with Karousel's key bindings
-        const move = (desktop) => {
-            if (wholeColumn) {
-                moveColumnToDesktop(dragController.lastColumnWindows, desktop);
-            } else {
-                moveWindowToDesktop(window, desktop);
-            }
-        };
-        // over the minimap only its cards are targets, not the rows behind it
-        if (minimapIndex !== -2) {
-            const index = minimapIndex;
-            const desktops = KWinComponents.Workspace.desktops;
-            if (index === desktops.length) {
-                move(createDesktop());
-            } else if (index !== -1 && !isOnDesktop(window, desktops[index])) {
-                move(desktops[index]);
-            }
-            return;
-        }
-        const row = rowAt(position);
-        if (wholeColumn && row !== null && row.hasWindow(window)) {
-            if (targetWindow !== null && row.hasWindow(targetWindow)) {
-                mergeColumn(dragController.lastColumnWindows, targetWindow, side, stacked, row);
-            } else if (tileWith !== null && row.hasWindow(tileWith)) {
-                tileColumn(window, tileWith, side, row);
-            } else {
-                row.reorderColumn(window, dropX, true);
-            }
-            return;
-        }
-        if (!wholeColumn && row !== null && targetWindow !== null && row.placesWindow(window) && row.hasWindow(targetWindow)) {
-            stackWindow(window, targetWindow, side, stacked, row);
-            return;
-        }
-        if (!wholeColumn && row !== null && tileWith !== null && row.placesWindow(window) && row.hasWindow(tileWith)) {
-            tileWindow(window, tileWith, side, row);
-            return;
-        }
-        if (!wholeColumn && row !== null && row.placesWindow(window)) {
-            row.reorderColumn(window, dropX, false);
-            return;
-        }
-
-        let desktop;
-        if (row !== null) {
-            desktop = row.desktop ?? createDesktop();
-        } else {
-            // dropping between two rows creates a new desktop there
-            const gap = gapAt(position);
-            if (gap === -1) {
-                return;
-            }
-            desktop = createDesktop(gap);
-        }
-        move(desktop);
-    }
-
-
-    // Karousel has key bindings that move a whole column for the first twelve desktops, index is the desktop's, the
-    // number of desktops for a new one
-    function canMoveColumnTo(index) {
-        return index < 12;
-    }
-
-    // a whole column, its windows given from top to bottom, through Karousel, which keeps it together and puts it at the
-    // end of the desktop's strip; it has key bindings for the first twelve desktops
-    function moveColumnToDesktop(windows, desktop) {
-        const index = KWinComponents.Workspace.desktops.indexOf(desktop);
-        if (index === -1 || index >= 12 || windows.length === 0) {
-            return;
-        }
-        const others = KWinComponents.Workspace.windows.filter(other => !windows.includes(other) && other.normalWindow
-            && !other.minimized && other.desktops.length === 1 && other.desktops[0] === desktop);
-        const right = Math.max(...others.map(other => {
-            const otherGeometry = geometryOf(other);
-            return otherGeometry.x + otherGeometry.width;
-        }));
-        const left = Math.min(...windows.map(window => geometryOf(window).x));
-        const width = Math.max(...windows.map(window => geometryOf(window).x + geometryOf(window).width)) - left;
-        const area = KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, targetScreen, desktop);
-        const x = others.length > 0 ? right + horizontalGap : area.x + (area.width - width) / 2;
-        // where it shows on that desktop until Karousel lays it out, see moveWindowToDesktop
-        for (const window of windows) {
-            const geometry = geometryOf(window);
-            overview.sceneEffect.layouts[window.internalId.toString()] = {
-                geometry: Qt.rect(x + geometry.x - left, geometry.y, geometry.width, geometry.height),
-                desktop: desktop.id,
-            };
-        }
-        focusWindow(windows[0]);
-        invokeKarousel([Layout.KarouselShortcuts.columnMoveToDesktop + (index + 1)]);
-        Qt.callLater(refreshSelection);
-    }
-
-    // the overview stays where it is; Karousel only lays out the current desktop, it adds the window as a column at the
-    // end of the desktop's strip once that desktop is current, or puts it in the middle of an empty one, so it's shown
-    // there until then, see main.qml's layouts
-    function moveWindowToDesktop(window, desktop) {
-        // where Karousel put it, its desktop may not be the current one
-        const geometry = geometryOf(window);
-        const others = KWinComponents.Workspace.windows.filter(other => other !== window && other.normalWindow
-            && !other.minimized && other.desktops.length === 1 && other.desktops[0] === desktop);
-        const right = Math.max(...others.map(other => {
-            const otherGeometry = geometryOf(other);
-            return otherGeometry.x + otherGeometry.width;
-        }));
-        const area = KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, targetScreen, desktop);
-        const x = others.length > 0 ? right + horizontalGap : area.x + (area.width - geometry.width) / 2;
-        // before it moves, its thumbnail on the other desktop reads it right away
-        overview.sceneEffect.layouts[window.internalId.toString()] = {
-            geometry: Qt.rect(x, geometry.y, geometry.width, geometry.height),
-            desktop: desktop.id,
-        };
-        window.desktops = [desktop];
-        // once the rows have caught up
-        Qt.callLater(refreshSelection);
-    }
-
     function handleKey(event) {
         switch (event.key) {
         case Qt.Key_Escape:
@@ -727,23 +350,20 @@ Item {
         event.accepted = true;
     }
 
-    KWinComponents.DBusCall {
-        id: invokeShortcut
-        service: "org.kde.kglobalaccel"
-        path: "/component/kwin"
-        method: "invokeShortcut"
+    KarouselDriver {
+        id: karouselDriver
+        overviewRoot: overview // qmllint disable incompatible-type
     }
 
-    KWinComponents.DBusCall {
-        id: karouselCheck
-        service: "org.kde.kglobalaccel"
-        path: "/component/kwin"
-        dbusInterface: "org.kde.kglobalaccel.Component"
-        method: "shortcutNames"
-        onFinished: returnValue => {
-            // the list of names may not arrive as a JavaScript array, as a string it's a comma-separated list
-            overview.karouselAvailable = String(returnValue[0]).includes(Layout.KarouselShortcuts.scrollLeftColumn);
-        }
+    DesktopActions {
+        id: actions
+        overviewRoot: overview // qmllint disable incompatible-type
+    }
+
+    ExternalDrag {
+        id: externalDragItem
+        anchors.fill: parent
+        overviewRoot: overview // qmllint disable incompatible-type
     }
 
     Backdrop {
@@ -865,7 +485,8 @@ Item {
         anchors.fill: parent
         z: 1
         overviewRoot: overview // qmllint disable incompatible-type
-        onDropped: (window, position, dropX, targetWindow, tileWindow, side, stacked, wholeColumn, minimapIndex) => overview.dropWindow(window, position, dropX, targetWindow, tileWindow, side, stacked, wholeColumn, minimapIndex)
+        onDropped: (window, position, dropX, targetWindow, tileWindow, side, stacked, wholeColumn, minimapIndex) => actions.dropWindow(
+            window, position, dropX, targetWindow, tileWindow, side, stacked, wholeColumn ? dragController.lastColumnWindows : [], minimapIndex)
     }
 
     // shows where dropping a window between two rows creates a new desktop, styled like the column insertion hint
@@ -886,7 +507,7 @@ Item {
         radius: height / 2
         color: Kirigami.Theme.highlightColor
         shadow.size: Kirigami.Units.gridUnit
-        shadow.color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.6)
+        shadow.color: overview.style.highlightAlpha(0.6)
         opacity: shown ? 1 : 0
         visible: opacity > 0
 
@@ -929,12 +550,12 @@ Item {
                 overview.cancelDrag();
             }
         }
-        // after the overview had the event, if it was the pointer's own
-        function onCursorPosChanged() {
-            // most moves are the pointer's own, over the overview
-            if (overview.externalDrag || !pointerHover.hovered) {
-                Qt.callLater(overview.updateExternalDrag);
+        // the rows show the windows of the current activity, laid out by Karousel for it
+        function onCurrentActivityChanged() {
+            for (const desktop of KWinComponents.Workspace.desktops) {
+                overview.rowForDesktop(desktop)?.scheduleUpdateBounds();
             }
+            Qt.callLater(overview.refreshSelection);
         }
         function onCurrentDesktopChanged() {
             overview.activeDesktop = overview.currentDesktop();
@@ -991,7 +612,7 @@ Item {
     Component.onDestruction: overview.sceneEffect.overviewDestroyed()
 
     Component.onCompleted: {
-        karouselCheck.call();
+        karousel.check();
         selectedWindow = KWinComponents.Workspace.activeWindow;
         rows.currentIndex = Math.max(0, KWinComponents.Workspace.desktops.indexOf(currentDesktop()));
         rows.positionViewAtIndex(rows.currentIndex, ListView.Center);

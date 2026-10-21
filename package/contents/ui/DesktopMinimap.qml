@@ -18,7 +18,7 @@ Item {
     // hidden until the dragged window comes close to where it would be
     // the pointer is at the edge it slides out from, see OverviewScreen
     property bool revealed: false
-    readonly property bool wanted: overviewRoot.config.MinimapAlwaysShown || drag.window !== null || overviewRoot.externalDrag || revealed || panelHover.hovered
+    readonly property bool wanted: overviewRoot.config.MinimapAlwaysShown || drag.window !== null || overviewRoot.externalDrag.active || revealed || panelHover.hovered
     // stays a moment after the pointer leaves it, so that it doesn't hide while moving back to it
     property bool shown: false
     onWantedChanged: {
@@ -62,7 +62,7 @@ Item {
     readonly property real cardRadius: Kirigami.Units.smallSpacing * 1.5
     // where the dragged window would go
     readonly property int dropIndex: drag.overMinimap && drag.dropAction !== "" ? drag.minimapIndex
-        : overviewRoot.externalDragCard
+        : overviewRoot.externalDrag.card
     // all windows, which each card filters for its desktop
     readonly property QtObject windowModel: KWinComponents.WindowModel {}
 
@@ -261,11 +261,11 @@ Item {
                     anchors.fill: parent
                     anchors.margins: -(minimap.frameGap + minimap.frameWidth + 1)
                     radius: minimap.cardRadius + minimap.frameGap + minimap.frameWidth + 1
-                    color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.35)
+                    color: minimap.overviewRoot.style.highlightAlpha(0.35)
                     border.width: minimap.frameWidth + 1
                     border.color: Kirigami.Theme.highlightColor
                     shadow.size: Kirigami.Units.gridUnit
-                    shadow.color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.8)
+                    shadow.color: minimap.overviewRoot.style.highlightAlpha(0.8)
                     opacity: card.target ? 1 : 0
                     visible: opacity > 0
 
@@ -290,7 +290,7 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     radius: minimap.cardRadius
-                    color: Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g, Kirigami.Theme.highlightColor.b, 0.2)
+                    color: minimap.overviewRoot.style.highlightAlpha(0.2)
                     visible: card.selected && !card.target
                 }
 
