@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5
+- Desktop minimap along the right edge, or the top: it slides out when the pointer reaches that edge (or is always shown), click a desktop to go there, and while dragging a window it's always shown, drop it on any desktop, also one far away (can be turned off)
+- Drag windows from the minimap too, e.g. from a desktop far away to the one shown
+- The minimap marks the selected desktop, the card a dragged window would go to stands out, and its windows show their app's icon in the theme's colours
+- Moving a window to another desktop keeps the overview on the current one, the window shows where Karousel will put it
+- Scrolling quickly through the desktops no longer makes the overview jump back and forth between two of them
+- The gaps between windows are right from the start, also with windows Karousel doesn't tile
+- The settings are grouped, options that depend on another one are greyed out while it's off
+- tools/nested-run.sh refuses to run without a nested session, instead of acting on the real one
+
 ## 0.4
 - The "New desktop" row looks like an empty desktop, with the current desktop's wallpaper see-through
 - Clicking a window centers it (can be turned off): the strip first glides to it, then the overview zooms in, without jumps
