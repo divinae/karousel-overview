@@ -23,6 +23,7 @@ It needs Karousel: it drives Karousel through its key bindings, and Karousel kee
 - Type to filter windows by name; if nothing matches, KRunner results are shown
 - Scroll vertically to jump between desktops, scroll horizontally (or Shift+scroll) to move a desktop's windows past its wallpaper, which stays in place
 - Right-click and drag anywhere in a desktop's strip, also over windows, to pan it; it keeps going when you let go fast, and settles on a column
+- Small desktops slide out when the pointer reaches the right edge, or the top: click one to go to that desktop; while dragging a window they're always shown, drop it on one to move it there, also to a desktop far away (can be turned off)
 - While dragging a window, push it against the left or right edge to scroll the strip, against the top or bottom edge to move between desktops, or hold it over a desktop to switch to it
 - Arrow keys move focus between windows and desktops (Karousel scrolls along), Enter closes the overview on the focused window, Delete closes it, Escape clears the search or closes the overview
 

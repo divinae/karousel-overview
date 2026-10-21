@@ -16,6 +16,10 @@ KWinComponents.SceneEffect {
     // desktop isn't current any more, KWin pulls the windows that are far off screen back onto it, on top of each other;
     // by window id, changed in place, nothing binds to it
     property var layouts: ({})
+    // Karousel's gaps in pixels, measured by the overview from its layout and kept for the next time it opens, see
+    // DesktopRow's refreshBounds; -1 for the vertical one until there's a column with more than one window to measure
+    property real horizontalGap: 0
+    property real verticalGap: -1
 
     function rememberGeometry(window) {
         const desktop = window.desktops.length === 1 ? window.desktops[0] : null;

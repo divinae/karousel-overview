@@ -166,3 +166,9 @@ test("innerGaps measures the smallest gap between columns and between windows in
 test("innerGaps has nothing to measure with a single window", () => {
     assert.deepEqual(plain(Layout.innerGaps([rect(0, 0, 100, 500)])), { horizontal: null, vertical: null });
 });
+
+test("innerGaps takes the most common gap, a window Karousel doesn't tile can be close to a column", () => {
+    // columns 8 px apart, and a floating window 2 px after the last one
+    const geometries = [rect(0, 0, 100, 500), rect(108, 0, 100, 500), rect(216, 0, 100, 500), rect(318, 100, 50, 50)];
+    assert.equal(Layout.innerGaps(geometries).horizontal, 8);
+});

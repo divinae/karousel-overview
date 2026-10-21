@@ -21,9 +21,9 @@ Item {
     readonly property DesktopRow currentRow: rows.currentItem as DesktopRow
 
     // Karousel's gaps between columns and between the windows in a column, in pixels, the overview keeps them
-    // although the windows are smaller, measured by the rows from where Karousel put the windows
-    property real horizontalGap: 0
-    property real verticalGap: horizontalGap
+    // although the windows are smaller, see main.qml
+    readonly property real horizontalGap: sceneEffect.horizontalGap
+    readonly property real verticalGap: sceneEffect.verticalGap >= 0 ? sceneEffect.verticalGap : horizontalGap
     property var selectedWindow: null
     readonly property var draggedWindow: dragController.window
     // the window that a dragged window would join the column of
@@ -98,6 +98,42 @@ Item {
         rows.currentIndex = index;
         const frame = row.viewportFramePosition(row);
         zoomOrigin = Qt.point(frame.x, rows.preferredHighlightBegin + frame.y);
+    }
+
+    // shows a desktop's row, the one after the last desktop creates a new desktop, reusing the last one if it's empty
+    function goToRow(index) {
+        navigatedAt = Date.now();
+        const desktops = KWinComponents.Workspace.desktops;
+        if (index === desktops.length) {
+            const last = desktops[desktops.length - 1];
+            if (KWinComponents.Workspace.windows.some(window => window.desktops.length === 1 && window.desktops[0] === last)) {
+                createDesktop();
+            } else {
+                index = desktops.length - 1;
+            }
+        }
+        rows.currentIndex = Layout.clamp(index, 0, rows.count - 1);
+        overview.currentRow?.selectClosestToViewport(false);
+    }
+
+    // the minimap's card at a point, the last one is for a new desktop, -1 when there's none
+    function minimapIndexAt(point) {
+        return minimap.item !== null ? (minimap.item as DesktopMinimap).indexAt(point) : -1;
+    }
+
+    function minimapContains(point) {
+        return minimap.item !== null && (minimap.item as DesktopMinimap).containsPoint(point);
+    }
+
+    // where scrolling a row by dragging against the right edge starts, before the minimap when it's beside the point
+    function scrollEdgeRight(point) {
+        const item = minimap.item as DesktopMinimap;
+        return item !== null && item.shown && !item.horizontal && point.y >= item.y && point.y < item.y + item.height ? item.x : width;
+    }
+
+    // a window on all desktops has none of its own
+    function isOnDesktop(window, desktop) {
+        return window.desktops.length === 0 || window.desktops.includes(desktop);
     }
 
     // where a new desktop would be inserted for a point in the gap between two rows, or -1
@@ -236,8 +272,19 @@ Item {
         invokeKarousel(Layout.repeat(columns > 0 ? Layout.KarouselShortcuts.scrollLeftColumn : Layout.KarouselShortcuts.scrollRightColumn, Math.abs(columns)));
     }
 
+    // when the user last moved to another row, KWin's answers to the focus changes on the way come later, see
+    // followsKWin
+    property real navigatedAt: 0
+
+    // whether to follow KWin's desktop switches and focus changes to another row; not right after moving to another row,
+    // they can come from a row passed on the way, e.g. when scrolling quickly, and would pull the overview back to it
+    function followsKWin() {
+        return Date.now() - navigatedAt > 400;
+    }
+
     // moves to another row without changing focus
     function showRow(delta) {
+        navigatedAt = Date.now();
         rows.currentIndex = Layout.clamp(rows.currentIndex + delta, 0, rows.count - 1);
     }
 
@@ -247,6 +294,7 @@ Item {
         if (index === rows.currentIndex) {
             return;
         }
+        navigatedAt = Date.now();
         rows.currentIndex = index;
         overview.currentRow.selectClosestToViewport(true);
     }
@@ -274,7 +322,18 @@ Item {
         dragController.cancel();
     }
 
-    function dropWindow(window, position, centerX, targetWindow) {
+    function dropWindow(window, position, centerX, targetWindow, minimapIndex) {
+        // over the minimap only its cards are targets, not the rows behind it
+        if (minimapIndex !== -2) {
+            const index = minimapIndex;
+            const desktops = KWinComponents.Workspace.desktops;
+            if (index === desktops.length) {
+                moveWindowToDesktop(window, createDesktop());
+            } else if (index !== -1 && !isOnDesktop(window, desktops[index])) {
+                moveWindowToDesktop(window, desktops[index]);
+            }
+            return;
+        }
         const row = rowAt(position);
         if (row !== null && targetWindow !== null && row.hasWindow(window) && row.hasWindow(targetWindow)) {
             stackWindow(window, targetWindow, row);
@@ -299,13 +358,27 @@ Item {
         moveWindowToDesktop(window, desktop);
     }
 
-    // Karousel picks this up and moves the window to the desktop's grid, but it only lays out the current desktop,
-    // so switch to it and focus the window to have it placed next to the other windows there
+    // the overview stays where it is; Karousel only lays out the current desktop, it adds the window as a column at the
+    // end of the desktop's strip once that desktop is current, or puts it in the middle of an empty one, so it's shown
+    // there until then, see main.qml's layouts
     function moveWindowToDesktop(window, desktop) {
+        const geometry = window.frameGeometry;
+        const others = KWinComponents.Workspace.windows.filter(other => other !== window && other.normalWindow
+            && !other.minimized && other.desktops.length === 1 && other.desktops[0] === desktop);
+        const right = Math.max(...others.map(other => {
+            const otherGeometry = geometryOf(other);
+            return otherGeometry.x + otherGeometry.width;
+        }));
+        const area = KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, targetScreen, desktop);
+        const x = others.length > 0 ? right + horizontalGap : area.x + (area.width - geometry.width) / 2;
+        // before it moves, its thumbnail on the other desktop reads it right away
+        overview.sceneEffect.layouts[window.internalId.toString()] = {
+            geometry: Qt.rect(x, geometry.y, geometry.width, geometry.height),
+            desktop: desktop.id,
+        };
         window.desktops = [desktop];
-        focusWindow(window);
-        selectedWindow = window;
-        rows.currentIndex = KWinComponents.Workspace.desktops.indexOf(desktop);
+        // once the rows have caught up
+        Qt.callLater(refreshSelection);
     }
 
     function handleKey(event) {
@@ -462,12 +535,38 @@ Item {
         }
     }
 
+    // only made when turned on; at the overview's origin, the minimap places itself
+    Loader {
+        id: minimap
+        z: 1
+        active: overview.config.ShowDropMinimap
+        sourceComponent: DesktopMinimap {
+            overviewRoot: overview // qmllint disable incompatible-type
+            drag: dragController
+            revealed: minimapEdgeHover.hovered
+            selectedIndex: rows.currentIndex
+        }
+    }
+
+    // reaching the edge the minimap sits at slides it out
+    Item {
+        z: 1
+        visible: minimap.active
+        x: overview.config.DropMinimapAtTop ? 0 : overview.width - width
+        width: overview.config.DropMinimapAtTop ? overview.width : Kirigami.Units.gridUnit
+        height: overview.config.DropMinimapAtTop ? Kirigami.Units.gridUnit : overview.height
+
+        HoverHandler {
+            id: minimapEdgeHover
+        }
+    }
+
     DragController {
         id: dragController
         anchors.fill: parent
         z: 1
         overviewRoot: overview // qmllint disable incompatible-type
-        onDropped: (window, position, centerX, targetWindow) => overview.dropWindow(window, position, centerX, targetWindow)
+        onDropped: (window, position, centerX, targetWindow, minimapIndex) => overview.dropWindow(window, position, centerX, targetWindow, minimapIndex)
     }
 
     // shows where dropping a window between two rows creates a new desktop, styled like the column insertion hint
@@ -534,7 +633,7 @@ Item {
         function onCurrentDesktopChanged() {
             overview.activeDesktop = overview.currentDesktop();
             const index = KWinComponents.Workspace.desktops.indexOf(overview.activeDesktop);
-            if (index !== -1 && overview.draggedWindow === null) {
+            if (index !== -1 && overview.draggedWindow === null && overview.followsKWin()) {
                 rows.currentIndex = index;
             }
         }
@@ -547,7 +646,9 @@ Item {
                 return;
             }
             overview.selectedWindow = window;
-            rows.currentIndex = row.index;
+            if (overview.followsKWin()) {
+                rows.currentIndex = row.index;
+            }
             // the row's sync glides to where Karousel scrolled
             if (!row.syncingScroll) {
                 row.ensureWindowVisible(window);

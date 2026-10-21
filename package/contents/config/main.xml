@@ -31,6 +31,18 @@
             <label>Clicking a window centers it on the screen, otherwise Karousel only scrolls as far as needed</label>
             <default>true</default>
         </entry>
+        <entry name="ShowDropMinimap" type="Bool">
+            <label>Show small desktops along the right edge when the pointer reaches it and while dragging a window, to go to or drop it on any of them</label>
+            <default>true</default>
+        </entry>
+        <entry name="MinimapAlwaysShown" type="Bool">
+            <label>Always show the desktop minimap, not only when the pointer reaches its edge or a window is dragged</label>
+            <default>false</default>
+        </entry>
+        <entry name="DropMinimapAtTop" type="Bool">
+            <label>Show the desktop minimap as a row along the top instead of a column along the right edge</label>
+            <default>false</default>
+        </entry>
         <entry name="ShowNewDesktopRow" type="Bool">
             <label>Show a "New desktop" row after the last desktop, to create a desktop by clicking it or dropping a window on it</label>
             <default>true</default>

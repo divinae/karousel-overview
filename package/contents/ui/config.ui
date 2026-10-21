@@ -2,176 +2,289 @@
 <ui version="4.0">
  <class>KarouselOverviewConfig</class>
  <widget class="QWidget" name="KarouselOverviewConfig">
-  <layout class="QFormLayout" name="formLayout">
-   <item row="0" column="0">
-    <widget class="QLabel" name="labelRowHeight">
-     <property name="text">
-      <string>Desktop row height:</string>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QGroupBox" name="groupOverview">
+     <property name="title">
+      <string>Overview</string>
      </property>
-     <property name="buddy">
-      <cstring>kcfg_RowHeight</cstring>
-     </property>
+     <layout class="QVBoxLayout">
+       <item>
+        <layout class="QHBoxLayout">
+         <item>
+          <widget class="QLabel" name="labelRowHeight">
+           <property name="text">
+            <string>Height of a desktop row:</string>
+           </property>
+           <property name="buddy">
+            <cstring>kcfg_RowHeight</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="kcfg_RowHeight">
+           <property name="toolTip">
+            <string>In percent of the screen height</string>
+           </property>
+           <property name="suffix">
+            <string>%</string>
+           </property>
+           <property name="minimum">
+            <number>20</number>
+           </property>
+           <property name="maximum">
+            <number>90</number>
+           </property>
+           <property name="singleStep">
+            <number>5</number>
+           </property>
+           <property name="value">
+            <number>50</number>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer>
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="kcfg_ShowIcons">
+         <property name="text">
+          <string>App icons on windows</string>
+         </property>
+         <property name="toolTip">
+          <string>An app icon at the bottom of each window</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="kcfg_ShowTitles">
+         <property name="text">
+          <string>Window titles on windows</string>
+         </property>
+         <property name="toolTip">
+          <string>Otherwise a window's title shows when you hover it</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="kcfg_ShowMinimized">
+         <property name="text">
+          <string>Minimized windows after each desktop</string>
+         </property>
+         <property name="toolTip">
+          <string>Shown dimmed at the end of their desktop, click one to restore it</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="kcfg_BlurBehindWindows">
+         <property name="text">
+          <string>Blur behind translucent windows</string>
+         </property>
+         <property name="toolTip">
+          <string>Blurs the wallpaper behind translucent windows, like KWin's blur effect does on the desktop</string>
+         </property>
+        </widget>
+       </item>
+     </layout>
     </widget>
    </item>
-   <item row="0" column="1">
-    <widget class="QSpinBox" name="kcfg_RowHeight">
-     <property name="toolTip">
-      <string>Height of a desktop row, in percent of the screen height</string>
+   <item>
+    <widget class="QGroupBox" name="groupClicking">
+     <property name="title">
+      <string>Clicking a window</string>
      </property>
-     <property name="suffix">
-      <string>%</string>
-     </property>
-     <property name="minimum">
-      <number>20</number>
-     </property>
-     <property name="maximum">
-      <number>90</number>
-     </property>
-     <property name="singleStep">
-      <number>5</number>
-     </property>
-     <property name="value">
-      <number>50</number>
-     </property>
+     <layout class="QVBoxLayout">
+       <item>
+        <widget class="QCheckBox" name="kcfg_CenterOnClick">
+         <property name="text">
+          <string>Center it on the screen</string>
+         </property>
+         <property name="toolTip">
+          <string>Otherwise Karousel only scrolls as far as needed to show it</string>
+         </property>
+        </widget>
+       </item>
+     </layout>
     </widget>
    </item>
-   <item row="1" column="0">
-    <widget class="QLabel" name="labelWindows">
-     <property name="text">
-      <string>Windows:</string>
+   <item>
+    <widget class="QGroupBox" name="groupDesktops">
+     <property name="title">
+      <string>Desktops</string>
      </property>
+     <layout class="QVBoxLayout">
+       <item>
+        <widget class="QCheckBox" name="kcfg_ShowNewDesktopRow">
+         <property name="text">
+          <string>“New desktop” row after the last desktop</string>
+         </property>
+         <property name="toolTip">
+          <string>Click it or drop a window on it to create a desktop; without it, drop a window between two desktops or after the last one</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="kcfg_RemoveEmptyDesktops">
+         <property name="text">
+          <string>Remove empty desktops created in the overview when closing</string>
+         </property>
+         <property name="toolTip">
+          <string>Like GNOME's dynamic workspaces, but only for desktops created in the overview, your other desktops stay</string>
+         </property>
+        </widget>
+       </item>
+     </layout>
     </widget>
    </item>
-   <item row="1" column="1">
-    <widget class="QCheckBox" name="kcfg_CenterOnClick">
-     <property name="text">
-      <string>Center the clicked window</string>
+   <item>
+    <widget class="QGroupBox" name="groupDragging">
+     <property name="title">
+      <string>Desktop minimap</string>
      </property>
-     <property name="toolTip">
-      <string>Clicking a window scrolls it to the middle of the screen, otherwise Karousel only scrolls as far as needed to show it</string>
-     </property>
+     <layout class="QVBoxLayout">
+       <item>
+        <widget class="QCheckBox" name="kcfg_ShowDropMinimap">
+         <property name="text">
+          <string>Small desktops at the screen's edge</string>
+         </property>
+         <property name="toolTip">
+          <string>Small desktops slide out when the pointer reaches the edge, click one to go to it; while dragging a window they are always shown, drop it on one to move it there, also to a desktop far away</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="kcfg_MinimapAlwaysShown">
+         <property name="text">
+          <string>Always shown</string>
+         </property>
+         <property name="toolTip">
+          <string>Otherwise it slides out when the pointer reaches its edge, and while a window is dragged</string>
+         </property>
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="kcfg_DropMinimapAtTop">
+         <property name="text">
+          <string>Minimap along the top instead of the right edge</string>
+         </property>
+         <property name="toolTip">
+          <string>A row along the top instead of a column along the right edge</string>
+         </property>
+         <property name="enabled">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+     </layout>
     </widget>
    </item>
-   <item row="2" column="0">
-    <widget class="QLabel" name="labelShow">
-     <property name="text">
-      <string>Show:</string>
+   <item>
+    <widget class="QGroupBox" name="groupGesture">
+     <property name="title">
+      <string>Touchpad</string>
      </property>
+     <layout class="QVBoxLayout">
+       <item>
+        <widget class="QCheckBox" name="kcfg_TouchpadGesture">
+         <property name="text">
+          <string>Swipe up to open the overview, down to close it</string>
+         </property>
+         <property name="toolTip">
+          <string>Follows your fingers</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout">
+         <item>
+          <widget class="QLabel" name="labelFingers">
+           <property name="text">
+            <string>Fingers:</string>
+           </property>
+           <property name="buddy">
+            <cstring>kcfg_GestureFingerCount</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="kcfg_GestureFingerCount">
+           <property name="toolTip">
+            <string>With 4 fingers, this clashes with Plasma's own Overview effect, which uses the same gesture</string>
+           </property>
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="minimum">
+            <number>3</number>
+           </property>
+           <property name="maximum">
+            <number>4</number>
+           </property>
+           <property name="value">
+            <number>3</number>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer>
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+     </layout>
     </widget>
    </item>
-   <item row="2" column="1">
-    <widget class="QCheckBox" name="kcfg_ShowIcons">
-     <property name="text">
-      <string>App icons</string>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="1">
-    <widget class="QCheckBox" name="kcfg_ShowTitles">
-     <property name="text">
-      <string>Window titles</string>
-     </property>
-    </widget>
-   </item>
-   <item row="4" column="1">
-    <widget class="QCheckBox" name="kcfg_ShowMinimized">
-     <property name="text">
-      <string>Minimized windows</string>
-     </property>
-     <property name="toolTip">
-      <string>Minimized windows are shown dimmed at the end of their desktop, click one to restore it</string>
-     </property>
-    </widget>
-   </item>
-   <item row="5" column="1">
-    <widget class="QCheckBox" name="kcfg_BlurBehindWindows">
-     <property name="text">
-      <string>Blur behind windows</string>
-     </property>
-     <property name="toolTip">
-      <string>Blurs the wallpaper behind translucent windows, like KWin's blur effect does on the desktop</string>
-     </property>
-    </widget>
-   </item>
-   <item row="6" column="0">
-    <widget class="QLabel" name="labelDesktops">
-     <property name="text">
-      <string>Desktops:</string>
-     </property>
-    </widget>
-   </item>
-   <item row="6" column="1">
-    <widget class="QCheckBox" name="kcfg_ShowNewDesktopRow">
-     <property name="text">
-      <string>"New desktop" row</string>
-     </property>
-     <property name="toolTip">
-      <string>A row after the last desktop, click it or drop a window on it to create a desktop; without it, drop a window between two desktops or after the last one</string>
-     </property>
-    </widget>
-   </item>
-   <item row="7" column="1">
-    <widget class="QCheckBox" name="kcfg_RemoveEmptyDesktops">
-     <property name="text">
-      <string>Remove empty desktops created here when closing</string>
-     </property>
-     <property name="toolTip">
-      <string>Like GNOME's dynamic workspaces, but only for desktops created in the overview, your other desktops stay: those without windows go away when the overview closes, except the current one</string>
-     </property>
-    </widget>
-   </item>
-   <item row="8" column="0">
-    <widget class="QLabel" name="labelGesture">
-     <property name="text">
-      <string>Touchpad gesture:</string>
-     </property>
-    </widget>
-   </item>
-   <item row="8" column="1">
-    <widget class="QCheckBox" name="kcfg_TouchpadGesture">
-     <property name="text">
-      <string>Swipe up to open, down to close</string>
-     </property>
-     <property name="toolTip">
-      <string>With 4 fingers, this clashes with Plasma's own Overview effect, which uses the same gesture</string>
-     </property>
-    </widget>
-   </item>
-   <item row="9" column="0">
-    <widget class="QLabel" name="labelFingers">
-     <property name="text">
-      <string>Fingers:</string>
-     </property>
-     <property name="buddy">
-      <cstring>kcfg_GestureFingerCount</cstring>
-     </property>
-    </widget>
-   </item>
-   <item row="9" column="1">
-    <widget class="QSpinBox" name="kcfg_GestureFingerCount">
-     <property name="minimum">
-      <number>3</number>
-     </property>
-     <property name="maximum">
-      <number>4</number>
-     </property>
-     <property name="value">
-      <number>3</number>
-     </property>
-    </widget>
-   </item>
-   <item row="10" column="0" colspan="2">
+   <item>
     <widget class="QLabel" name="labelScreenEdges">
      <property name="text">
-      <string>Screen edges that toggle the overview can be set in System Settings, under Screen Edges.</string>
+      <string>The overview also opens with Meta+Ctrl+O, and with screen edges set in System Settings, under Screen Edges.</string>
      </property>
      <property name="wordWrap">
       <bool>true</bool>
      </property>
     </widget>
    </item>
+   <item>
+    <spacer>
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+    </spacer>
+   </item>
   </layout>
  </widget>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>kcfg_ShowDropMinimap</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>kcfg_DropMinimapAtTop</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
+  <connection>
+   <sender>kcfg_ShowDropMinimap</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>kcfg_MinimapAlwaysShown</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
+  <connection>
+   <sender>kcfg_TouchpadGesture</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>kcfg_GestureFingerCount</receiver>
+   <slot>setEnabled(bool)</slot>
+  </connection>
+ </connections>
 </ui>

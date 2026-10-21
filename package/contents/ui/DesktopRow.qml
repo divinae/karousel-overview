@@ -130,16 +130,16 @@ Item {
         }
         updateMinimized();
         // from the current desktop, laid out by Karousel right now, also the windows hidden by the search,
-        // which leave bigger gaps
-        if (!scrollsKarousel) {
+        // which leave bigger gaps; right away, not only once Karousel's key bindings have been found
+        if (desktop === null || desktop !== overviewRoot.activeDesktop) {
             return;
         }
         const gaps = Layout.innerGaps(karouselWindows().map(window => window.frameGeometry));
         if (gaps.horizontal !== null) {
-            overviewRoot.horizontalGap = gaps.horizontal;
+            overviewRoot.sceneEffect.horizontalGap = gaps.horizontal;
         }
         if (gaps.vertical !== null) {
-            overviewRoot.verticalGap = gaps.vertical;
+            overviewRoot.sceneEffect.verticalGap = gaps.vertical;
         }
     }
 

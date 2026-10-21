@@ -21,6 +21,9 @@ Item {
     property var targetWindow: null
     // where dropping creates a new desktop when between two rows, -1 otherwise
     property int hoveredGap: -1
+    // over the desktop minimap, and its card under the dragged window, the last one is for a new desktop
+    property bool overMinimap: false
+    property int minimapIndex: -1
     // what dropping here does, shown next to the dragged window, empty when nothing
     property string dropAction: ""
     // the row showing a hint of what dropping does
@@ -28,7 +31,8 @@ Item {
     // center of the dragged thumbnail, where it gets dropped
     readonly property real centerX: window !== null ? position.x - offset.x + window.frameGeometry.width * overviewRoot.thumbScale / 2 : 0
 
-    signal dropped(QtObject window, point position, real centerX, QtObject targetWindow)
+    // minimapIndex is the minimap's card it's dropped on, -1 between its cards, -2 when not over the minimap
+    signal dropped(QtObject window, point position, real centerX, QtObject targetWindow, int minimapIndex)
 
     function start(window, item, scenePosition) {
         const itemPosition = item.mapToItem(controller, 0, 0);
@@ -50,8 +54,10 @@ Item {
         refresh();
         const droppedWindow = window;
         const targetWindow = controller.targetWindow;
+        // the minimap hides once nothing is dragged
+        const minimapIndex = overMinimap ? controller.minimapIndex : -2;
         reset();
-        dropped(droppedWindow, position, position.x, targetWindow);
+        dropped(droppedWindow, position, position.x, targetWindow, minimapIndex);
     }
 
     // ends the drag without dropping, e.g. when the dragged window or its thumbnail goes away
@@ -68,11 +74,26 @@ Item {
         hoveredRow = null;
         targetWindow = null;
         hoveredGap = -1;
+        overMinimap = false;
+        minimapIndex = -1;
     }
 
     // finds what's under the dragged window
     function refresh() {
         if (window === null) {
+            return;
+        }
+        // over the minimap only its cards are targets, not the rows behind it
+        overMinimap = overviewRoot.minimapContains(position);
+        minimapIndex = overviewRoot.minimapIndexAt(position);
+        if (overMinimap) {
+            hoveredRow = null;
+            hoveredGap = -1;
+            targetWindow = null;
+            setHintRow(null);
+            const desktops = KWinComponents.Workspace.desktops;
+            dropAction = minimapIndex === -1 || (minimapIndex < desktops.length && overviewRoot.isOnDesktop(window, desktops[minimapIndex])) ? ""
+                : minimapIndex === desktops.length ? "Move to a new desktop" : "Move to " + desktops[minimapIndex].name;
             return;
         }
         hoveredRow = overviewRoot.rowAt(position);
@@ -127,7 +148,9 @@ Item {
         repeat: true
         running: controller.window !== null
         onTriggered: {
-            const speed = Layout.edgeScrollSpeed(controller.position.x, controller.width, Kirigami.Units.gridUnit * 4);
+            // over the minimap its cards are the targets, beside it the zone ends where it starts
+            const right = controller.overviewRoot.scrollEdgeRight(controller.position);
+            const speed = controller.overMinimap ? 0 : Layout.edgeScrollSpeed(controller.position.x, right, Kirigami.Units.gridUnit * 4);
             if (speed !== 0) {
                 controller.hoveredRow?.panBy(-speed * Kirigami.Units.gridUnit * 1.5);
             }
@@ -142,6 +165,10 @@ Item {
         repeat: true
         running: controller.window !== null
         onTriggered: {
+            // aiming at the minimap's cards near the edges
+            if (controller.overMinimap) {
+                return;
+            }
             const zone = Kirigami.Units.gridUnit * 3;
             if (controller.position.y < zone) {
                 controller.overviewRoot.showRow(-1);
@@ -163,9 +190,10 @@ Item {
         }
     }
 
-    // what dropping here does
+    // what dropping here does, left of the pointer when it wouldn't fit on its right, e.g. over the minimap
     Rectangle {
-        x: controller.position.x + Kirigami.Units.gridUnit
+        x: controller.position.x + Kirigami.Units.gridUnit + width <= controller.width
+            ? controller.position.x + Kirigami.Units.gridUnit : controller.position.x - Kirigami.Units.gridUnit - width
         y: controller.position.y + Kirigami.Units.gridUnit
         z: 1
         width: actionLabel.implicitWidth + 2 * Kirigami.Units.largeSpacing
@@ -182,10 +210,22 @@ Item {
         }
     }
 
+    // over the minimap the dragged window shrinks around the pointer, so that it doesn't hide the cards
+    property real ghostScale: overMinimap ? 0.3 : 1
+    Behavior on ghostScale {
+        NumberAnimation { duration: Kirigami.Units.shortDuration; easing.type: Easing.OutCubic }
+    }
+
     Loader {
         active: controller.window !== null
         x: controller.position.x - controller.offset.x
         y: controller.position.y - controller.offset.y
+        transform: Scale {
+            origin.x: controller.offset.x
+            origin.y: controller.offset.y
+            xScale: controller.ghostScale
+            yScale: controller.ghostScale
+        }
         sourceComponent: KWinComponents.WindowThumbnail {
             id: ghost
             wId: controller.window.internalId

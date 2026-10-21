@@ -189,25 +189,38 @@ function emptyDesktops(desktops, windowDesktops, kept) {
 }
 
 // Karousel's gaps between columns and between the windows in a column, measured from where it put the windows
-// of one desktop, since its settings can't be read from here; null where there's nothing to measure
+// of one desktop, since its settings can't be read from here; the most common one, Karousel's gaps are all the same,
+// a window it doesn't tile can be anywhere; null where there's nothing to measure
 function innerGaps(geometries) {
     const columns = computeColumns(geometries.map(geometry => ({ window: geometry, geometry: geometry })));
-    let horizontal = null;
-    let vertical = null;
+    const horizontal = [];
     for (let i = 1; i < columns.length; i++) {
-        const gap = columns[i].x - (columns[i - 1].x + columns[i - 1].width);
-        if (gap >= 0 && (horizontal === null || gap < horizontal)) {
-            horizontal = gap;
-        }
+        horizontal.push(columns[i].x - (columns[i - 1].x + columns[i - 1].width));
     }
+    const vertical = [];
     for (const column of columns) {
         const windows = column.windows.slice().sort((a, b) => a.y - b.y);
         for (let i = 1; i < windows.length; i++) {
-            const gap = windows[i].y - (windows[i - 1].y + windows[i - 1].height);
-            if (gap >= 0 && (vertical === null || gap < vertical)) {
-                vertical = gap;
-            }
+            vertical.push(windows[i].y - (windows[i - 1].y + windows[i - 1].height));
         }
     }
-    return { horizontal: horizontal, vertical: vertical };
+    return { horizontal: mostCommon(horizontal), vertical: mostCommon(vertical) };
+}
+
+// the most common of the non-negative values, rounded, the smallest of those when there's a tie; null when none
+function mostCommon(values) {
+    const counts = new Map();
+    for (const value of values) {
+        if (value >= 0) {
+            const rounded = Math.round(value);
+            counts.set(rounded, (counts.get(rounded) ?? 0) + 1);
+        }
+    }
+    let best = null;
+    for (const [value, count] of counts) {
+        if (best === null || count > counts.get(best) || (count === counts.get(best) && value < best)) {
+            best = value;
+        }
+    }
+    return best;
 }
