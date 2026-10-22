@@ -17,7 +17,8 @@ Item {
     readonly property rect geometry: overviewRoot.geometryOf(window)
     readonly property bool selected: overviewRoot.selectedWindow === window
     readonly property bool dropTarget: overviewRoot.dropTargetWindow === window
-    readonly property bool showControls: hover.hovered && overviewRoot.draggedWindow === null && overviewRoot.zoom === 1
+    readonly property bool closing: overviewRoot.closing
+    readonly property bool showControls: hover.hovered && overviewRoot.draggedWindow === null && overviewRoot.zoom === 1 && !closing
 
     // on each side, what makes the gaps between the shrunk windows as big as Karousel's are on screen,
     // grows with the zoom so that the zoom animation starts with windows at their real positions
@@ -175,7 +176,7 @@ Item {
         height: info.implicitHeight + Kirigami.Units.smallSpacing
         radius: Kirigami.Units.cornerRadius
         color: Qt.rgba(0, 0, 0, 0.7)
-        visible: showIcon || showTitle
+        visible: (showIcon || showTitle) && !thumb.closing
         opacity: thumb.overviewRoot.zoom
 
         Row {

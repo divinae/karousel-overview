@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.1
+- While searching, the desktop shown in the overview is the current one, so an app started from the results opens there instead of on the one the overview was opened on; a result that goes to a window elsewhere still goes there
+- Clicking a window in a stacked column centers it, the column narrowed instead; clicking another window in a centered column keeps it centered
+- A centered column with windows a little narrower than it, like terminals, is taken as centered
+- Columns with several windows no longer have a frame around them, it jumped while Karousel moved them; their grip shows them
+- As soon as a window is clicked or the overview closes, the windows' icons, titles and buttons and the columns' grips and Stack buttons hide, instead of lagging behind the zoom; not while a touchpad gesture opens the overview
+
 ## 0.8
 - A search field at the top, "Type to search": typing still goes there right away, ✕ clears it, Ctrl+A selects the text, so that typing replaces it and Backspace or Delete clears it
 - While searching, a card with KRunner's results, apps and more, shows right below the field, and the current desktop's matching windows below it; Up or Tab goes from the windows into the results, Down from the last one back, the other desktops fade

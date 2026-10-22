@@ -196,16 +196,16 @@ msgid ""
 "System Settings, under Screen Edges."
 msgstr ""
 
-#: package/contents/ui/ColumnBar.qml:102
+#: package/contents/ui/ColumnBar.qml:104
 msgid "Move column"
 msgstr ""
 
-#: package/contents/ui/ColumnBar.qml:174
+#: package/contents/ui/ColumnBar.qml:176
 msgctxt "@action:button the windows of a column"
 msgid "Stack"
 msgstr ""
 
-#: package/contents/ui/ColumnBar.qml:174
+#: package/contents/ui/ColumnBar.qml:176
 msgctxt "@action:button the windows of a column"
 msgid "Unstack"
 msgstr ""
@@ -294,12 +294,12 @@ msgctxt "@action:button the search"
 msgid "Clear"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:217
+#: package/contents/ui/WindowThumb.qml:218
 msgctxt "@action:button a window"
 msgid "Close"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:248
+#: package/contents/ui/WindowThumb.qml:249
 msgid "Toggle floating"
 msgstr ""
 

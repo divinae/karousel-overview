@@ -28,7 +28,7 @@ Item {
         const cursor = KWinComponents.Workspace.cursorPos;
         const point = Qt.point(cursor.x - overviewRoot.screenGeometry.x, cursor.y - overviewRoot.screenGeometry.y);
         // the pointer's own events would have reached the overview by now, see onCursorPosChanged
-        if (pointerHovered || overviewRoot.draggedWindow !== null || !overviewRoot.sceneEffect.activated || overviewRoot.activating
+        if (pointerHovered || overviewRoot.draggedWindow !== null || overviewRoot.closing
                 || point.x < 0 || point.y < 0 || point.x >= overviewRoot.width || point.y >= overviewRoot.height) {
             end();
             return;

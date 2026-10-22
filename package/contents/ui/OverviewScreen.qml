@@ -54,6 +54,9 @@ Item {
     readonly property ExternalDrag externalDrag: externalDragItem
     // the overview zooms into a clicked window once its strip has glided there
     readonly property bool activating: activationTimer.running
+    // a window was clicked or the overview closes, not while a gesture opens it: what's drawn over the windows, their
+    // icons, titles and buttons, goes right away, it wouldn't follow the zoom
+    readonly property bool closing: activating || (!sceneEffect.activated && !sceneEffect.gestureInProgress)
     // the current desktop of this screen, kept up to date
     property var activeDesktop: currentDesktop()
     property string searchText: ""
@@ -697,7 +700,19 @@ Item {
     onSearchingChanged: {
         resultsFocused = searching && !config.SearchWindowsFirst;
         Qt.callLater(rows.glideToRowsTop);
+        followShownDesktop();
     }
+
+    // while searching, the desktop shown is the current one, so that an app started from the results opens there;
+    // a result that goes to a window or desktop of its own goes there, the "New desktop" row isn't one yet
+    function followShownDesktop() {
+        const desktop = currentRow?.desktop ?? null;
+        if (searching && desktop !== null && desktop !== currentDesktop()) {
+            navigatedAt = Date.now();
+            KWinComponents.Workspace.setCurrentDesktopForScreen(desktop, targetScreen);
+        }
+    }
+    onCurrentRowChanged: followShownDesktop()
     onSearchTextChanged: {
         searchSelected = false;
         Qt.callLater(refreshSelection);

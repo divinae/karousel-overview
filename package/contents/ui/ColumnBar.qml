@@ -66,12 +66,14 @@ Item {
     }
 
     x: alive ? columnBar.strip.toStripX(modelData.x) : 0
-    // right above the column's frame
+    // right above the column
     y: alive ? (modelData.y - columnBar.strip.screenGeometry.y) * columnBar.strip.thumbScale - Kirigami.Units.smallSpacing - height : 0
     z: 100000
     width: alive ? modelData.width * columnBar.strip.thumbScale : 0
     height: Kirigami.Units.gridUnit * 1.5
-    opacity: alive ? (columnBar.strip.overviewRoot.draggedWindow === null || dragged ? 1 : 0) * columnBar.strip.overviewRoot.zoom : 0
+    // gone right away when a window is clicked or the overview closes, see OverviewScreen.closing
+    readonly property bool hidden: !alive || strip.overviewRoot.closing
+    opacity: hidden ? 0 : (columnBar.strip.overviewRoot.draggedWindow === null || dragged ? 1 : 0) * columnBar.strip.overviewRoot.zoom
     visible: opacity > 0
 
     // Karousel rearranging recreates them, the drag would never end without the DragHandler that tracks it
@@ -81,7 +83,7 @@ Item {
         }
     }
 
-    // a pill with two rows of three dots, the usual sign for something to drag, on the frame's top edge,
+    // a pill with two rows of three dots, the usual sign for something to drag, on the column's top edge,
     // floating like the windows
     Kirigami.ShadowedRectangle {
         anchors.horizontalCenter: parent.horizontalCenter

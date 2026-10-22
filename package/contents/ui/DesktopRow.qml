@@ -44,7 +44,7 @@ Item {
     property real stripMaxX: screenGeometry.x + screenGeometry.width
     // windows grouped by column, sorted from left to right
     property var columns: []
-    // those with more than one window, which get a frame and a grip
+    // those with more than one window, which get a grip
     readonly property var sharedColumns: columns.filter(column => column.windows.length > 1)
     readonly property int windowCount: thumbs.count
     // where a dragged column would land, in the strip's coordinates, NaN when not dragging one
@@ -546,11 +546,36 @@ Item {
             syncWhileClosing = activating;
             lastKarouselMove = Date.now();
         }
-        // Karousel's centering toggles, from the middle it scrolls the window back to the side
-        const centered = !center || isCentered(window);
         overviewRoot.focusWindow(window);
-        if (syncs && !centered) {
-            overviewRoot.karousel.invoke([Layout.KarouselShortcuts.scrollFocused]);
+        if (syncs && center) {
+            // once Karousel has scrolled for the focus change, its grouped scrolling can move a centered column to the
+            // side for that; its centering toggles, from the middle it would scroll the window back to the side
+            // a moment later: Karousel takes in the focus change of a stacked column a little later, and centering
+            // before that narrows the column instead; the zoom waits for it, see readyToZoom
+            centeringWindow = window;
+            centeringTimer.restart();
+        }
+    }
+
+    property var centeringWindow: null
+    // the window centered, and until when the zoom waits for that, see readyToZoom
+    property var centeredWindow: null
+    property real centeringUntil: 0
+
+    Timer {
+        id: centeringTimer
+        interval: 150
+        onTriggered: {
+            const window = row.centeringWindow;
+            row.centeringWindow = null;
+            // closed or no longer focused meanwhile, Karousel would center another one
+            if (window === null || KWinComponents.Workspace.activeWindow !== window || row.isCentered(window)) {
+                return;
+            }
+            row.overviewRoot.karousel.invoke([Layout.KarouselShortcuts.scrollFocused]);
+            // the zoom waits for it to arrive through D-Bus, see readyToZoom
+            row.centeredWindow = window;
+            row.centeringUntil = Date.now() + 400;
         }
     }
 
@@ -558,7 +583,9 @@ Item {
     function isCentered(window) {
         const area = KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, overviewRoot.targetScreen, desktop);
         const column = karouselColumns().find(column => column.windows.includes(window));
-        return column !== undefined && Math.abs(column.x + column.width / 2 - (area.x + area.width / 2)) <= 1;
+        // apps like terminals round their size to their character cells, so their windows can be a little narrower than
+        // the column Karousel centers; taking a centered one for one off center would scroll it away again
+        return column !== undefined && Math.abs(column.x + column.width / 2 - (area.x + area.width / 2)) <= Kirigami.Units.smallSpacing * 2;
     }
 
     // Karousel is done moving the windows, they go where they really are, and the view moves by as much in the same frame,
@@ -649,7 +676,9 @@ Item {
     // after clicking a window: Karousel is done moving the windows and the strip has glided to them,
     // the overview can zoom in
     function readyToZoom() {
-        return !snapAnimation.running && Date.now() - lastKarouselMove > 40;
+        const centering = centeringTimer.running
+            || (Date.now() < centeringUntil && centeredWindow !== null && !isCentered(centeredWindow));
+        return !snapAnimation.running && !centering && Date.now() - lastKarouselMove > 40;
     }
 
     function glideTo(contentX, duration = Kirigami.Units.longDuration, easing = Easing.OutCubic) {
@@ -923,25 +952,6 @@ Item {
             x: row.toStripX(row.screenGeometry.x)
             width: row.screenGeometry.width * row.thumbScale
             height: row.height
-        }
-
-        // frames around columns with more than one window
-        Repeater {
-            model: row.sharedColumns
-
-            Rectangle {
-                required property var modelData
-
-                x: row.toStripX(modelData.x) - Kirigami.Units.smallSpacing
-                y: (modelData.y - row.screenGeometry.y) * row.thumbScale - Kirigami.Units.smallSpacing
-                width: modelData.width * row.thumbScale + 2 * Kirigami.Units.smallSpacing
-                height: (modelData.bottom - modelData.y) * row.thumbScale + 2 * Kirigami.Units.smallSpacing
-                color: row.style.foregroundAlpha(0.05)
-                radius: Kirigami.Units.cornerRadius
-                border.width: 1
-                border.color: row.style.foregroundAlpha(0.3)
-                opacity: row.overviewRoot.zoom
-            }
         }
 
         // above each column with more than one window: a handle to drag the whole column by, and a button between
