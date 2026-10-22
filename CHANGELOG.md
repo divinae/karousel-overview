@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2
+- A column's grip sits entirely above the column, no longer half over its top window, which could take the drag and move only itself
+- A thin frame around a column's windows, from the middle of its grip, which sits on it like a tab, shows what the grip moves again; it fades in once the windows have moved, instead of jumping ahead of them, and hides while a window is dragged; the grip is a little see-through and floats on it with a shadow
+- A floating window lying over a column's grip no longer takes a drag that started on the grip
+
 ## 0.8.1
 - While searching, the desktop shown in the overview is the current one, so an app started from the results opens there instead of on the one the overview was opened on; a result that goes to a window elsewhere still goes there
 - Clicking a window in a stacked column centers it, the column narrowed instead; clicking another window in a centered column keeps it centered

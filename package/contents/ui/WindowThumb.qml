@@ -285,8 +285,8 @@ Item {
 
     DragHandler {
         target: null
-        // don't let the Flickables steal the drag, but the column's grip, which sits partly over the window, may have
-        // it; this one doesn't take it from the grip, which would move the window alone instead of the column
+        // don't let the Flickables steal the drag, but don't take it from a column's grip strip, which a floating window
+        // can lie over, that would drop the column and move the window instead
         grabPermissions: PointerHandler.CanTakeOverFromItems | PointerHandler.CanTakeOverFromHandlersOfDifferentType
             | PointerHandler.ApprovesTakeOverByHandlersOfSameType
         onActiveChanged: {

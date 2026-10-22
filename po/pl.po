@@ -221,21 +221,21 @@ msgstr ""
 "Przegląd otwiera się też skrótem Meta+Ctrl+O oraz krawędziami ekranu "
 "ustawionymi w Ustawieniach systemowych, w sekcji Krawędzie ekranu."
 
-#: package/contents/ui/ColumnBar.qml:104
+#: package/contents/ui/ColumnBar.qml:24
 msgid "Move column"
 msgstr "Przenieś kolumnę"
 
-#: package/contents/ui/ColumnBar.qml:176
+#: package/contents/ui/ColumnBar.qml:241
 msgctxt "@action:button the windows of a column"
 msgid "Stack"
 msgstr "Ułóż w stos"
 
-#: package/contents/ui/ColumnBar.qml:176
+#: package/contents/ui/ColumnBar.qml:241
 msgctxt "@action:button the windows of a column"
 msgid "Unstack"
 msgstr "Rozłóż stos"
 
-#: package/contents/ui/DesktopPill.qml:89 package/contents/ui/DesktopRow.qml:90
+#: package/contents/ui/DesktopPill.qml:89 package/contents/ui/DesktopRow.qml:92
 msgid "New desktop"
 msgstr "Nowy pulpit"
 

@@ -196,21 +196,21 @@ msgid ""
 "System Settings, under Screen Edges."
 msgstr ""
 
-#: package/contents/ui/ColumnBar.qml:104
+#: package/contents/ui/ColumnBar.qml:24
 msgid "Move column"
 msgstr ""
 
-#: package/contents/ui/ColumnBar.qml:176
+#: package/contents/ui/ColumnBar.qml:241
 msgctxt "@action:button the windows of a column"
 msgid "Stack"
 msgstr ""
 
-#: package/contents/ui/ColumnBar.qml:176
+#: package/contents/ui/ColumnBar.qml:241
 msgctxt "@action:button the windows of a column"
 msgid "Unstack"
 msgstr ""
 
-#: package/contents/ui/DesktopPill.qml:89 package/contents/ui/DesktopRow.qml:90
+#: package/contents/ui/DesktopPill.qml:89 package/contents/ui/DesktopRow.qml:92
 msgid "New desktop"
 msgstr ""
 

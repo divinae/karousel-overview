@@ -46,6 +46,8 @@ Item {
     property var columns: []
     // those with more than one window, which get a grip
     readonly property var sharedColumns: columns.filter(column => column.windows.length > 1)
+    // where each column's bar was last made, by its first window, see ColumnBar's fade; changed in place
+    property var columnBarLayouts: ({})
     readonly property int windowCount: thumbs.count
     // where a dragged column would land, in the strip's coordinates, NaN when not dragging one
     property real insertHintX: NaN
@@ -921,8 +923,9 @@ Item {
     Flickable {
         id: flick
         anchors.fill: parent
-        // reaches a little above the row, where the columns' grips stick out: a Flickable doesn't pass on events outside
-        // of itself; the margin keeps the content where it was, at the only position the bounds allow
+        // reaches a little above the row, where the strips to drag columns by are, above columns at the top of the screen:
+        // a Flickable doesn't pass on events outside of itself; the margin keeps the content where it was, at the only
+        // position the bounds allow
         anchors.topMargin: -Kirigami.Units.gridUnit * 2
         topMargin: Kirigami.Units.gridUnit * 2
         // not clipped, so that the wallpaper's shadow shows above and below the row
