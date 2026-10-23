@@ -14,7 +14,8 @@ Item {
     required property OverviewScreen overviewRoot
 
     // Karousel's layout, also on desktops that aren't current, see OverviewScreen's geometryOf
-    readonly property rect geometry: overviewRoot.geometryOf(window)
+    readonly property var slot: overviewRoot.slotOf(window, strip)
+    readonly property rect geometry: slot ?? overviewRoot.layoutGeometryOf(window)
     readonly property bool selected: overviewRoot.selectedWindow === window
     readonly property bool dropTarget: overviewRoot.dropTargetWindow === window
     readonly property bool closing: overviewRoot.closing
@@ -113,7 +114,7 @@ Item {
         FastBlur {
             anchors.fill: parent
             // the row can go away before its thumbnails, when its desktop is removed
-            visible: thumb.overviewRoot.config.BlurBehindWindows && thumb.strip !== null && thumb.strip.desktop !== null
+            visible: thumb.overviewRoot.config.BlurBehindWindows && thumb.strip !== null && thumb.strip.desktop !== null && thumb.slot === null
             // FastBlur's largest radius, on a texture of half the size, so it's as strong as KWin's blur
             radius: 64
             source: ShaderEffectSource {
@@ -125,6 +126,14 @@ Item {
                 textureSize: Qt.size(Math.max(1, thumb.width / 2), Math.max(1, thumb.height / 2))
                 wrapMode: ShaderEffectSource.ClampToEdge
             }
+        }
+
+        // shown in its column's place, a screen's worth of window in a column: dark around it like a screen, not the
+        // wallpaper, the window keeps its proportions in the middle
+        Rectangle {
+            anchors.fill: parent
+            visible: thumb.slot !== null
+            color: Qt.rgba(0, 0, 0, 0.6)
         }
 
         KWinComponents.WindowThumbnail {
@@ -199,6 +208,50 @@ Item {
                 elide: Text.ElideRight
                 color: "white"
                 visible: label.showTitle
+            }
+        }
+    }
+
+    // fullscreen or maximized, shown in its column's place, see OverviewScreen.slotOf; at the top in the middle,
+    // between the column's Stack button and the close button, the title is at the bottom; only the icon when narrow
+    Rectangle {
+        id: fillsBadge
+        // the text's own width, the row's changes with it
+        readonly property real fullWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing + badgeText.implicitWidth
+        readonly property bool showText: thumb.width > fullWidth + 2 * Kirigami.Units.iconSizes.smallMedium + 6 * Kirigami.Units.smallSpacing
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: Kirigami.Units.smallSpacing
+        width: (showText ? fullWidth : Kirigami.Units.iconSizes.small) + 2 * Kirigami.Units.largeSpacing
+        height: Kirigami.Units.iconSizes.smallMedium
+        radius: height / 2
+        color: Qt.rgba(0, 0, 0, 0.7)
+        visible: thumb.slot !== null && !thumb.closing
+        opacity: thumb.overviewRoot.zoom
+
+        Accessible.role: Accessible.StaticText
+        Accessible.name: badgeText.text
+
+        Row {
+            id: badgeRow
+            anchors.centerIn: parent
+            spacing: Kirigami.Units.smallSpacing
+
+            Kirigami.Icon {
+                anchors.verticalCenter: parent.verticalCenter
+                width: Kirigami.Units.iconSizes.small
+                height: width
+                source: "view-fullscreen"
+                color: "white"
+                isMask: true
+            }
+
+            Text {
+                id: badgeText
+                anchors.verticalCenter: parent.verticalCenter
+                text: thumb.window.fullScreen ? I18n.tr("Fullscreen") : I18n.tr("Maximized")
+                color: "white"
+                visible: fillsBadge.showText
             }
         }
     }

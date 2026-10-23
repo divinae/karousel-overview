@@ -7,7 +7,7 @@ import vm from "node:vm";
 const source = readFileSync(new URL("../package/contents/ui/layout.js", import.meta.url), "utf8")
     .replace(/^\.pragma library$/m, "");
 const Layout = {};
-vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, stackBesideMoves, isStacked, expelMoves, columnIndex, isTiledColumn, dropZone, scrollSteps, placeAtEnd, tileMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
+vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, stackBesideMoves, isStacked, slotX, lastTiled, expelMoves, columnIndex, isTiledColumn, dropZone, scrollSteps, placeAtEnd, tileMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
 
 const rect = (x, y, width, height) => ({ x, y, width, height });
 // objects from the vm context have that context's prototypes, which deepEqual tells apart
@@ -309,4 +309,31 @@ test("computeColumns keeps a floating window of the same width over a column out
     ]);
     assert.deepEqual(plain(columns.find(column => column.windows.includes("a")).windows), ["a", "b"]);
     assert.equal(columns.length, 3);
+});
+
+test("slotX finds a column's place among the other columns as they are now", () => {
+    const slot = { x: 328, width: 933 };
+    const area = { x: 32, width: 3408 };
+    const column = x => ({ x: x, width: 933 });
+    // the middle one, wherever Karousel has scrolled them since
+    assert.equal(Layout.slotX(slot, [column(328), column(2210)], area, 8), 1269);
+    assert.equal(Layout.slotX(slot, [column(2210), column(-613), column(328), column(3151)], area, 8), 1269);
+    // the gap not measured yet
+    assert.equal(Layout.slotX(slot, [column(328), column(2210)], area, 0), 1269);
+    // the first or the last, the one on screen, with the gap between the others
+    assert.equal(Layout.slotX(slot, [column(1277), column(2226)], area, 0), 328);
+    assert.equal(Layout.slotX(slot, [column(1269), column(2210)], area, 8), 328);
+    assert.equal(Layout.slotX(slot, [column(328), column(1269)], area, 8), 2210);
+    // both on screen, the one nearer to where it was
+    assert.equal(Layout.slotX({ x: 2000, width: 933 }, [column(1269)], area, 8), 2210);
+    assert.equal(Layout.slotX(slot, [column(1269)], area, 8), 328);
+    assert.equal(Layout.slotX(slot, [], area, 8), 328);
+});
+
+test("lastTiled skips the fullscreen and maximized geometries", () => {
+    const layout = (x, width) => ({ geometry: rect(x, 0, width, 1440) });
+    const coverings = [rect(0, 0, 3440, 1440), rect(32, 0, 3408, 1440)];
+    assert.equal(Layout.lastTiled([layout(328, 933), layout(1269, 933), layout(32, 3408)], coverings).geometry.x, 1269);
+    assert.equal(Layout.lastTiled([layout(328, 933), layout(0, 3440), layout(32, 3408)], coverings).geometry.x, 328);
+    assert.equal(Layout.lastTiled([layout(0, 3440)], coverings), undefined);
 });

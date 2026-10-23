@@ -319,15 +319,23 @@ msgctxt "@action:button the search"
 msgid "Clear"
 msgstr "Wyczyść"
 
-#: package/contents/ui/WindowThumb.qml:218
+#: package/contents/ui/WindowThumb.qml:252
+msgid "Fullscreen"
+msgstr "Pełny ekran"
+
+#: package/contents/ui/WindowThumb.qml:252
+msgid "Maximized"
+msgstr "Zmaksymalizowane"
+
+#: package/contents/ui/WindowThumb.qml:271
 msgctxt "@action:button a window"
 msgid "Close"
 msgstr "Zamknij"
 
-#: package/contents/ui/WindowThumb.qml:249
+#: package/contents/ui/WindowThumb.qml:302
 msgid "Toggle floating"
 msgstr "Przełącz pływanie"
 
-#: package/contents/ui/main.qml:99
+#: package/contents/ui/main.qml:129
 msgid "Karousel: Toggle overview"
 msgstr "Karousel: Przełącz przegląd"

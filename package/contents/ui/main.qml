@@ -18,6 +18,29 @@ KWinComponents.SceneEffect {
     // by layoutKey, changed in place, nothing binds to it
     property var layouts: ({})
 
+    // where Karousel last tiled each window, the last three geometries while it wasn't fullscreen or maximized, by
+    // layoutKey, changed in place, see tiledGeometry
+    property var tiledLayouts: ({})
+
+    // over the whole screen, which Karousel leaves alone, while its column keeps its place among the others; not
+    // maximized in one direction only
+    function fillsScreen(window) {
+        return window.fullScreen || window.maximizeMode === 3;
+    }
+
+    // where a fullscreen or maximized window was last tiled on the desktop it's on, null when not known; KWin gives a
+    // window its fullscreen or maximized geometry before it says so, the latest of the last few that doesn't cover the
+    // screen is the one
+    function tiledGeometry(window) {
+        if (window.desktops.length !== 1) {
+            return null;
+        }
+        const desktop = window.desktops[0];
+        const coverings = [window.output.geometry, KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, window.output, desktop)];
+        const layout = Layout.lastTiled((tiledLayouts[layoutKey(window)] ?? []).filter(layout => layout.desktop === desktop.id), coverings);
+        return layout?.geometry ?? null;
+    }
+
     // Karousel has a layout for each desktop in each activity, a window in several activities has one in each
     function layoutKey(window) {
         return window.internalId.toString() + "/" + KWinComponents.Workspace.currentActivity;
@@ -31,10 +54,15 @@ KWinComponents.SceneEffect {
         const desktop = window.desktops.length === 1 ? window.desktops[0] : null;
         if (desktop !== null && desktop === KWinComponents.Workspace.currentDesktopForScreen(window.output)) {
             const geometry = window.frameGeometry;
-            layouts[layoutKey(window)] = {
+            const layout = {
                 geometry: Qt.rect(geometry.x, geometry.y, geometry.width, geometry.height),
                 desktop: desktop.id,
             };
+            layouts[layoutKey(window)] = layout;
+            // the last few, see tiledGeometry
+            if (!fillsScreen(window)) {
+                tiledLayouts[layoutKey(window)] = (tiledLayouts[layoutKey(window)] ?? []).slice(-2).concat([layout]);
+            }
         }
     }
 
@@ -59,8 +87,10 @@ KWinComponents.SceneEffect {
             }
             Component.onCompleted: effect.rememberGeometry(tracker.window)
             Component.onDestruction: {
-                for (const key of Object.keys(effect.layouts).filter(key => key.startsWith(tracker.windowId + "/"))) {
-                    delete effect.layouts[key];
+                for (const store of [effect.layouts, effect.tiledLayouts]) {
+                    for (const key of Object.keys(store).filter(key => key.startsWith(tracker.windowId + "/"))) {
+                        delete store[key];
+                    }
                 }
             }
         }

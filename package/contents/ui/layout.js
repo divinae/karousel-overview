@@ -193,6 +193,49 @@ function placeAtEnd(others, area, width, gap) {
     };
 }
 
+// the latest of a window's remembered layouts, oldest first, whose geometry isn't one of the coverings, those of a
+// fullscreen or maximized window; undefined without one
+function lastTiled(layouts, coverings) {
+    const same = (a, b) => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1
+        && Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
+    return layouts.slice().reverse().find(layout => !coverings.some(covering => same(layout.geometry, covering)));
+}
+
+// the x of a fullscreen or maximized window's column, which Karousel keeps empty among the other columns, also while
+// it scrolls them: slot is where the window was last tiled, columns the other columns as tall as it now, area where
+// Karousel lays out, gap between its columns; the empty place between two columns that fits it best, otherwise the
+// first or the last place, the one on screen, the window was focused when it went fullscreen, or the one nearer to
+// where it was, a gap away from the others, as between them if they have one; where it was without any other column
+function slotX(slot, columns, area, gap) {
+    if (columns.length === 0) {
+        return slot.x;
+    }
+    const sorted = columns.slice().sort((a, b) => a.x - b.x);
+    let best = null;
+    for (let i = 1; i < sorted.length; i++) {
+        const end = sorted[i - 1].x + sorted[i - 1].width;
+        const room = sorted[i].x - end;
+        if (room >= slot.width && (best === null || room < best.room)) {
+            // in the middle, whatever the gap
+            best = { room: room, x: end + (room - slot.width) / 2 };
+        }
+    }
+    if (best !== null) {
+        return best.x;
+    }
+    const gaps = sorted.slice(1).map((column, i) => column.x - sorted[i].x - sorted[i].width).filter(room => room >= 0);
+    if (gaps.length > 0) {
+        gap = Math.min(...gaps);
+    }
+    const first = sorted[0].x - gap - slot.width;
+    const last = sorted[sorted.length - 1].x + sorted[sorted.length - 1].width + gap;
+    const shown = x => x >= area.x - 2 && x + slot.width <= area.x + area.width + 2;
+    if (shown(first) !== shown(last)) {
+        return shown(first) ? first : last;
+    }
+    return Math.abs(first - slot.x) <= Math.abs(last - slot.x) ? first : last;
+}
+
 // whether a column's windows, given from top to bottom, are in Karousel's stacked layout, where they overlap
 function isStacked(geometries) {
     for (let i = 1; i < geometries.length; i++) {

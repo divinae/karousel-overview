@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.9
+- A fullscreen or maximized window is shown in its column's place, which Karousel keeps for it, instead of over the whole strip and all the other windows: on a dark card like a screen, with a "Fullscreen" or "Maximized" label, and the place follows Karousel's scrolling
+
 ## 0.8.2
 - A column's grip sits entirely above the column, no longer half over its top window, which could take the drag and move only itself
 - A thin frame around a column's windows, from the middle of its grip, which sits on it like a tab, shows what the grip moves again; it fades in once the windows have moved, instead of jumping ahead of them, and hides while a window is dragged; the grip is a little see-through and floats on it with a shadow

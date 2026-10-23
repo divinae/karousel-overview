@@ -294,15 +294,23 @@ msgctxt "@action:button the search"
 msgid "Clear"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:218
+#: package/contents/ui/WindowThumb.qml:252
+msgid "Fullscreen"
+msgstr ""
+
+#: package/contents/ui/WindowThumb.qml:252
+msgid "Maximized"
+msgstr ""
+
+#: package/contents/ui/WindowThumb.qml:271
 msgctxt "@action:button a window"
 msgid "Close"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:249
+#: package/contents/ui/WindowThumb.qml:302
 msgid "Toggle floating"
 msgstr ""
 
-#: package/contents/ui/main.qml:99
+#: package/contents/ui/main.qml:129
 msgid "Karousel: Toggle overview"
 msgstr ""

@@ -126,7 +126,13 @@ Item {
         if (desktop === null || desktop !== overviewRoot.activeDesktop) {
             return;
         }
-        const gaps = Layout.innerGaps(karouselWindows().map(window => window.frameGeometry));
+        // not with a fullscreen or maximized window, which covers the screen while Karousel keeps its column's place
+        // empty, see OverviewScreen.slotOf, the gap would be that place
+        const windows = karouselWindows();
+        if (windows.some(window => overviewRoot.sceneEffect.fillsScreen(window))) {
+            return;
+        }
+        const gaps = Layout.innerGaps(windows.map(window => window.frameGeometry));
         if (gaps.horizontal !== null) {
             overviewRoot.sceneEffect.horizontalGap = gaps.horizontal;
         }
@@ -525,7 +531,8 @@ Item {
         syncTimer.interval = firstInterval;
         syncTimer.restart();
         snapAnimation.stop();
-        const anchor = thumbItems().reduce((best, thumb) => best === null
+        // not a fullscreen or maximized window, its frame stays over the screen while Karousel moves its column
+        const anchor = thumbItems().filter(thumb => !overviewRoot.sceneEffect.fillsScreen(thumb.window)).reduce((best, thumb) => best === null
             || Math.abs(thumb.layoutX - flick.contentX - viewportLeft) < Math.abs(best.layoutX - flick.contentX - viewportLeft) ? thumb : best, null);
         syncAnchor = anchor === null ? null : anchor.window;
         syncAnchorX = anchor === null ? NaN : toStripX(anchor.window.frameGeometry.x);
