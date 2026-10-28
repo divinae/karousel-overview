@@ -236,6 +236,15 @@ function slotX(slot, columns, area, gap) {
     return Math.abs(first - slot.x) <= Math.abs(last - slot.x) ? first : last;
 }
 
+// where the window at index, from the top, of a column of count windows is shown while the column is spread out in the
+// overview, one under another, gap apart, as tall as each other; as wide as its aspect, width over height, makes it,
+// at most the column's width, in the middle of it; see DesktopRow's fanWindows
+function fanOut(column, count, index, gap, aspect) {
+    const height = (column.bottom - column.y - (count - 1) * gap) / count;
+    const width = Math.min(column.width, height * aspect);
+    return { x: column.x + (column.width - width) / 2, y: column.y + index * (height + gap), width: width, height: height };
+}
+
 // whether a column's windows, given from top to bottom, are in Karousel's stacked layout, where they overlap
 function isStacked(geometries) {
     for (let i = 1; i < geometries.length; i++) {

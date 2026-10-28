@@ -46,6 +46,15 @@ Item {
     property var columns: []
     // those with more than one window, which get a grip
     readonly property var sharedColumns: columns.filter(column => column.windows.length > 1)
+    // a stacked column spread out one under another in the overview, only there, so that each of its windows can be
+    // picked: while the pointer is over it or its grip strip, or a window in it was selected with the keys; by its
+    // windows, any of them still there finds it, see shownGeometry
+    property var fanWindows: []
+    readonly property var fanColumn: fanWindows.length === 0 ? null
+        : columns.find(column => column.windows.length > 1 && column.windows.some(window => fanWindows.includes(window))) ?? null
+    // the pointer over the strip, in its coordinates, null when it isn't; whichever of the two moved last asks for it
+    property var pointerPosition: null
+    property var keyboardWindow: null
     // where each column's bar was last made, by its first window, see ColumnBar's fade; changed in place
     property var columnBarLayouts: ({})
     readonly property int windowCount: thumbs.count
@@ -237,6 +246,100 @@ Item {
         items.forEach((item, i) => item.slotX = slots.xs[i]);
         minimizedEnd = slots.end;
     }
+
+    // where a window's thumbnail is shown: in its spread out column, see fanWindows, otherwise at geometry, Karousel's
+    // layout; back to that as the overview zooms into a window, so the zoom glides into the stack without a jump
+    function shownGeometry(window, geometry) {
+        const index = fanColumn === null ? -1 : fanColumn.windows.indexOf(window);
+        if (index === -1) {
+            return geometry;
+        }
+        // its own aspect, as the thumbnail keeps it, it would be letterboxed otherwise
+        const aspect = window.frameGeometry.height > 0 ? window.frameGeometry.width / window.frameGeometry.height : 1;
+        const target = Layout.fanOut(fanColumn, fanColumn.windows.length, index, overviewRoot.verticalGap, aspect);
+        const t = overviewRoot.zoom;
+        return Qt.rect(geometry.x + (target.x - geometry.x) * t, geometry.y + (target.y - geometry.y) * t,
+                       geometry.width + (target.width - geometry.width) * t, geometry.height + (target.height - geometry.height) * t);
+    }
+
+    // the stacked column the keys or the pointer ask to spread out, null for none; not while dragging, which needs
+    // Karousel's real layout to drop onto, searching, or Karousel's view is being synced
+    function wantedFanColumn() {
+        if (overviewRoot.draggedWindow !== null || overviewRoot.searching || syncingScroll) {
+            return null;
+        }
+        const column = keyboardWindow !== null ? columns.find(column => column.windows.includes(keyboardWindow)) : columnAtPointer();
+        return column !== undefined && column.windows.length > 1 && isStackedColumn(column) ? column : null;
+    }
+
+    // the column the pointer is over, or its grip strip above it: the column's whole area, the same whether it's
+    // stacked or spread out, which happens within it, so that spreading it out doesn't move it from under the pointer
+    function columnAtPointer() {
+        const point = pointerPosition;
+        if (point === null) {
+            return undefined;
+        }
+        const grip = Kirigami.Units.gridUnit * 2;
+        return columns.find(column => point.x >= toStripX(column.x) && point.x < toStripX(column.x + column.width)
+            && point.y >= (column.y - screenGeometry.y) * thumbScale - grip && point.y < (column.bottom - screenGeometry.y) * thumbScale);
+    }
+
+    function pointerMoved(position) {
+        // only when it really moved, not when the thumbnails moved under it
+        if (position !== null && pointerPosition !== null && position.x === pointerPosition.x && position.y === pointerPosition.y) {
+            return;
+        }
+        pointerPosition = position === null ? null : Qt.point(position.x, position.y);
+        keyboardWindow = null;
+        fanTimer.restart();
+    }
+
+    // stays the same while the overview zooms into a window, see shownGeometry
+    function updateFan() {
+        if (overviewRoot.closing) {
+            return;
+        }
+        const column = wantedFanColumn();
+        const windows = column === null ? [] : column.windows;
+        if (windows.length !== fanWindows.length || windows.some((window, i) => window !== fanWindows[i])) {
+            fanWindows = windows;
+        }
+    }
+
+    // a moment after the pointer stops on a column, not on the way across it, and while it crosses the gaps between
+    // the spread out windows
+    Timer {
+        id: fanTimer
+        interval: 200
+        onTriggered: row.updateFan()
+    }
+
+    Connections {
+        target: row.overviewRoot
+        // right away, the windows go back to where Karousel has them before they're dragged
+        function onDraggedWindowChanged() {
+            row.updateFan();
+        }
+        function onSearchingChanged() {
+            row.updateFan();
+        }
+        // selected some other way than with the arrow keys, e.g. on another desktop
+        function onSelectedWindowChanged() {
+            if (row.keyboardWindow !== null && row.overviewRoot.selectedWindow !== row.keyboardWindow) {
+                row.keyboardWindow = null;
+                fanTimer.restart();
+            }
+        }
+        // a fresh start each time the overview opens
+        function onClosingChanged() {
+            if (!row.overviewRoot.closing) {
+                row.fanWindows = [];
+                row.keyboardWindow = null;
+            }
+        }
+    }
+    onSyncingScrollChanged: updateFan()
+    onColumnsChanged: fanTimer.restart()
 
     function thumbItems() {
         const items = [];
@@ -739,11 +842,11 @@ Item {
             return;
         }
         const index = items.findIndex(thumb => thumb.window === overviewRoot.selectedWindow);
-        if (index === -1) {
-            select(items[delta > 0 ? 0 : items.length - 1], true);
-        } else {
-            select(items[Math.max(0, Math.min(items.length - 1, index + delta))], true);
-        }
+        const item = index === -1 ? items[delta > 0 ? 0 : items.length - 1] : items[Math.max(0, Math.min(items.length - 1, index + delta))];
+        select(item, true);
+        // selected with the keys, its stacked column spreads out, see fanWindows
+        keyboardWindow = item.window;
+        fanTimer.restart();
     }
 
     function selectClosestToViewport(focus) {
@@ -946,6 +1049,13 @@ Item {
 
         onMovementEnded: row.snapToColumn()
         onFlickEnded: row.snapToColumn()
+
+        // where the pointer is over the strip, see fanWindows; it sees the pointer over the thumbnails too, none of
+        // them blocks hovering
+        HoverHandler {
+            onPointChanged: row.pointerMoved(hovered ? point.position : null)
+            onHoveredChanged: row.pointerMoved(hovered ? point.position : null)
+        }
 
         Item {
             width: flick.contentWidth

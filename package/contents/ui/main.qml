@@ -196,6 +196,19 @@ KWinComponents.SceneEffect {
         temporaryDesktops = temporaryDesktops.filter(id => ids.includes(id));
     }
 
+    // whether KWin's color blindness correction is on, see OverviewScreen's layer; asked again each time the overview
+    // opens, it can be turned on and off meanwhile
+    property bool colorCorrectionLoaded: false
+    property KWinComponents.DBusCall colorCorrectionCheck: KWinComponents.DBusCall {
+        service: "org.kde.KWin"
+        path: "/Effects"
+        dbusInterface: "org.kde.kwin.Effects"
+        method: "isEffectLoaded"
+        arguments: ["colorblindnesscorrection"]
+        onFinished: returnValue => effect.colorCorrectionLoaded = returnValue[0] === true
+    }
+    Component.onCompleted: colorCorrectionCheck.call()
+
     function toggle() {
         if (activated) {
             deactivate();
@@ -210,6 +223,7 @@ KWinComponents.SceneEffect {
             return;
         }
         deactivateTimer.stop();
+        colorCorrectionCheck.call();
         visible = true;
         activated = true;
     }
@@ -223,6 +237,9 @@ KWinComponents.SceneEffect {
     }
 
     function partialActivate(factor) {
+        if (!visible) {
+            colorCorrectionCheck.call();
+        }
         deactivateTimer.stop();
         visible = true;
         gestureInProgress = true;

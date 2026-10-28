@@ -30,7 +30,7 @@ msgstr "Wysokość wiersza pulpitu:"
 msgid "In percent of the screen height"
 msgstr "W procentach wysokości ekranu"
 
-#: config.ui.js:4
+#: config.ui.js:4 /tmp/tmp.dUQ8mmmm27/config.ui.js:22
 msgid "%"
 msgstr "%"
 
@@ -71,38 +71,79 @@ msgstr ""
 "pulpicie"
 
 #: config.ui.js:13
+msgid "Color blindness correction"
+msgstr "Korekcja daltonizmu"
+
+#: config.ui.js:14
+msgid ""
+"KWin's color blindness correction doesn't reach the overview, which draws "
+"the windows itself. Set the same here, it applies while KWin's correction is "
+"turned on."
+msgstr ""
+"Korekcja daltonizmu KWin nie obejmuje przeglądu, który sam rysuje okna. "
+"Ustaw tutaj to samo, działa, gdy korekcja KWin jest włączona."
+
+#: config.ui.js:15
+msgid "Mode:"
+msgstr "Tryb:"
+
+#: config.ui.js:16
+msgid "None"
+msgstr "Brak"
+
+#: config.ui.js:17
+msgid "Protanopia (red-green)"
+msgstr "Protanopia (czerwony-zielony)"
+
+#: config.ui.js:18
+msgid "Deuteranopia (green-red)"
+msgstr "Deuteranopia (zielony-czerwony)"
+
+#: config.ui.js:19
+msgid "Tritanopia (blue-yellow)"
+msgstr "Tritanopia (niebieski-żółty)"
+
+#: config.ui.js:20
+msgid "Grayscale"
+msgstr "Skala szarości"
+
+#: config.ui.js:21
+msgid "Intensity:"
+msgstr "Intensywność:"
+
+#: config.ui.js:23
 msgid "Clicking a window"
 msgstr "Kliknięcie okna"
 
-#: config.ui.js:14
+#: config.ui.js:24
 msgid "Center it on the screen"
 msgstr "Wyśrodkuj je na ekranie"
 
-#: config.ui.js:15
+#: config.ui.js:25
 msgid "Otherwise Karousel only scrolls as far as needed to show it"
 msgstr ""
 "W przeciwnym razie Karousel przewija tylko tyle, ile trzeba, aby je pokazać"
 
-#: config.ui.js:16
+#: config.ui.js:26
 msgid "Searching"
 msgstr "Wyszukiwanie"
 
-#: config.ui.js:17
+#: config.ui.js:27
 msgid "Search field always shown"
 msgstr "Pole wyszukiwania zawsze widoczne"
 
-#: config.ui.js:18
+#: config.ui.js:28
 msgid ""
 "Otherwise it only shows once you start typing, typing searches either way"
 msgstr ""
 "W przeciwnym razie pokazuje się dopiero po rozpoczęciu pisania, pisanie i "
 "tak wyszukuje"
 
-#: config.ui.js:19
+#: config.ui.js:29
 msgid "Search windows too"
 msgstr "Szukaj też okien"
 
-#: config.ui.js:20
+#: config.ui.js:30
 msgid ""
 "Typing filters the windows on the desktops; otherwise it only searches apps "
 "and more, like KRunner"
@@ -110,11 +151,11 @@ msgstr ""
 "Wpisywanie filtruje okna na pulpitach; w przeciwnym razie szuka tylko "
 "aplikacji i innych wyników, jak KRunner"
 
-#: config.ui.js:21
+#: config.ui.js:31
 msgid "Windows first, then apps"
 msgstr "Najpierw okna, potem aplikacje"
 
-#: config.ui.js:22
+#: config.ui.js:32
 msgid ""
 "Arrows and Enter go to the matching windows, Up or Tab to the apps above "
 "them; otherwise the other way round, Enter starts the first app"
@@ -123,15 +164,15 @@ msgstr ""
 "przechodzi do aplikacji nad nimi; w przeciwnym razie odwrotnie, Enter "
 "uruchamia pierwszą aplikację"
 
-#: config.ui.js:23
+#: config.ui.js:33
 msgid "Desktops"
 msgstr "Pulpity"
 
-#: config.ui.js:24
+#: config.ui.js:34
 msgid "“New desktop” row after the last desktop"
 msgstr "Wiersz „Nowy pulpit” za ostatnim pulpitem"
 
-#: config.ui.js:25
+#: config.ui.js:35
 msgid ""
 "Click it or drop a window on it to create a desktop; without it, drop a "
 "window between two desktops or after the last one"
@@ -139,11 +180,11 @@ msgstr ""
 "Kliknij go albo upuść na nim okno, aby utworzyć pulpit; bez niego upuść okno "
 "między dwoma pulpitami albo za ostatnim"
 
-#: config.ui.js:26
+#: config.ui.js:36
 msgid "Remove empty desktops created in the overview when closing"
 msgstr "Usuwaj przy zamykaniu puste pulpity utworzone w przeglądzie"
 
-#: config.ui.js:27
+#: config.ui.js:37
 msgid ""
 "Like GNOME's dynamic workspaces, but only for desktops created in the "
 "overview, your other desktops stay"
@@ -151,15 +192,15 @@ msgstr ""
 "Jak dynamiczne obszary robocze w GNOME, ale tylko dla pulpitów utworzonych w "
 "przeglądzie, pozostałe twoje pulpity zostają"
 
-#: config.ui.js:28
+#: config.ui.js:38
 msgid "Desktop minimap"
 msgstr "Minimapa pulpitów"
 
-#: config.ui.js:29
+#: config.ui.js:39
 msgid "Small desktops at the screen's edge"
 msgstr "Małe pulpity przy krawędzi ekranu"
 
-#: config.ui.js:30
+#: config.ui.js:40
 msgid ""
 "Small desktops slide out when the pointer reaches the edge, click one to go "
 "to it; while dragging a window they are always shown, drop it on one to move "
@@ -169,11 +210,11 @@ msgstr ""
 "aby do niego przejść; podczas przeciągania okna są zawsze widoczne, upuść je "
 "na jednym, aby je tam przenieść, także na odległy pulpit"
 
-#: config.ui.js:31
+#: config.ui.js:41
 msgid "Always shown"
 msgstr "Zawsze widoczna"
 
-#: config.ui.js:32
+#: config.ui.js:42
 msgid ""
 "Otherwise it slides out when the pointer reaches its edge, and while a "
 "window is dragged"
@@ -181,31 +222,31 @@ msgstr ""
 "W przeciwnym razie wysuwa się, gdy wskaźnik dotrze do jej krawędzi, i "
 "podczas przeciągania okna"
 
-#: config.ui.js:33
+#: config.ui.js:43
 msgid "Minimap along the top instead of the right edge"
 msgstr "Minimapa u góry zamiast przy prawej krawędzi"
 
-#: config.ui.js:34
+#: config.ui.js:44
 msgid "A row along the top instead of a column along the right edge"
 msgstr "Rząd u góry zamiast kolumny przy prawej krawędzi"
 
-#: config.ui.js:35
+#: config.ui.js:45
 msgid "Touchpad"
 msgstr "Touchpad"
 
-#: config.ui.js:36
+#: config.ui.js:46
 msgid "Swipe up to open the overview, down to close it"
 msgstr "Przesunięcie w górę otwiera przegląd, w dół go zamyka"
 
-#: config.ui.js:37
+#: config.ui.js:47
 msgid "Follows your fingers"
 msgstr "Podąża za palcami"
 
-#: config.ui.js:38
+#: config.ui.js:48
 msgid "Fingers:"
 msgstr "Palce:"
 
-#: config.ui.js:39
+#: config.ui.js:49
 msgid ""
 "With 4 fingers, this clashes with Plasma's own Overview effect, which uses "
 "the same gesture"
@@ -213,7 +254,7 @@ msgstr ""
 "Przy 4 palcach koliduje to z efektem Przegląd w Plasmie, który używa tego "
 "samego gestu"
 
-#: config.ui.js:40
+#: config.ui.js:50
 msgid ""
 "The overview also opens with Meta+Ctrl+O, and with screen edges set in "
 "System Settings, under Screen Edges."
@@ -235,7 +276,8 @@ msgctxt "@action:button the windows of a column"
 msgid "Unstack"
 msgstr "Rozłóż stos"
 
-#: package/contents/ui/DesktopPill.qml:89 package/contents/ui/DesktopRow.qml:92
+#: package/contents/ui/DesktopPill.qml:89
+#: package/contents/ui/DesktopRow.qml:101
 msgid "New desktop"
 msgstr "Nowy pulpit"
 
@@ -319,20 +361,20 @@ msgctxt "@action:button the search"
 msgid "Clear"
 msgstr "Wyczyść"
 
-#: package/contents/ui/WindowThumb.qml:252
+#: package/contents/ui/WindowThumb.qml:257
 msgid "Fullscreen"
 msgstr "Pełny ekran"
 
-#: package/contents/ui/WindowThumb.qml:252
+#: package/contents/ui/WindowThumb.qml:257
 msgid "Maximized"
 msgstr "Zmaksymalizowane"
 
-#: package/contents/ui/WindowThumb.qml:271
+#: package/contents/ui/WindowThumb.qml:276
 msgctxt "@action:button a window"
 msgid "Close"
 msgstr "Zamknij"
 
-#: package/contents/ui/WindowThumb.qml:302
+#: package/contents/ui/WindowThumb.qml:307
 msgid "Toggle floating"
 msgstr "Przełącz pływanie"
 

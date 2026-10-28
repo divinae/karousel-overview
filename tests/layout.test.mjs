@@ -7,7 +7,7 @@ import vm from "node:vm";
 const source = readFileSync(new URL("../package/contents/ui/layout.js", import.meta.url), "utf8")
     .replace(/^\.pragma library$/m, "");
 const Layout = {};
-vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, stackBesideMoves, isStacked, slotX, lastTiled, expelMoves, columnIndex, isTiledColumn, dropZone, scrollSteps, placeAtEnd, tileMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
+vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, stackBesideMoves, isStacked, fanOut, slotX, lastTiled, expelMoves, columnIndex, isTiledColumn, dropZone, scrollSteps, placeAtEnd, tileMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
 
 const rect = (x, y, width, height) => ({ x, y, width, height });
 // objects from the vm context have that context's prototypes, which deepEqual tells apart
@@ -336,4 +336,17 @@ test("lastTiled skips the fullscreen and maximized geometries", () => {
     assert.equal(Layout.lastTiled([layout(328, 933), layout(1269, 933), layout(32, 3408)], coverings).geometry.x, 1269);
     assert.equal(Layout.lastTiled([layout(328, 933), layout(0, 3440), layout(32, 3408)], coverings).geometry.x, 328);
     assert.equal(Layout.lastTiled([layout(0, 3440)], coverings), undefined);
+});
+
+test("fanOut spreads a column's windows one under another, as tall as each other", () => {
+    const column = { x: 100, y: 10, width: 900, bottom: 1010 };
+    // as wide as the column
+    assert.deepEqual(plain(Layout.fanOut(column, 2, 0, 0, 3)), { x: 100, y: 10, width: 900, height: 500 });
+    assert.deepEqual(plain(Layout.fanOut(column, 2, 1, 0, 3)), { x: 100, y: 510, width: 900, height: 500 });
+    // narrower, in the middle
+    assert.deepEqual(plain(Layout.fanOut(column, 2, 1, 0, 1)), { x: 300, y: 510, width: 500, height: 500 });
+    // with a gap between them
+    const column3 = { x: 100, y: 10, width: 900, bottom: 1029 };
+    assert.deepEqual(plain(Layout.fanOut(column3, 3, 0, 10, 3)), { x: 100, y: 10, width: 900, height: 333 });
+    assert.deepEqual(plain(Layout.fanOut(column3, 3, 2, 10, 3)), { x: 100, y: 696, width: 900, height: 333 });
 });

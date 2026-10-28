@@ -96,6 +96,81 @@
     </widget>
    </item>
    <item>
+    <widget class="QGroupBox" name="groupColorCorrection">
+     <property name="title">
+      <string>Color blindness correction</string>
+     </property>
+     <layout class="QFormLayout">
+       <item row="0" column="0" colspan="2">
+        <widget class="QLabel" name="labelColorCorrection">
+         <property name="text">
+          <string>KWin's color blindness correction doesn't reach the overview, which draws the windows itself. Set the same here, it applies while KWin's correction is turned on.</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="labelColorCorrectionMode">
+         <property name="text">
+          <string>Mode:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QComboBox" name="kcfg_ColorCorrection">
+         <item>
+          <property name="text">
+           <string>None</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Protanopia (red-green)</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Deuteranopia (green-red)</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Tritanopia (blue-yellow)</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Grayscale</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="labelColorCorrectionIntensity">
+         <property name="text">
+          <string>Intensity:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QSpinBox" name="kcfg_ColorCorrectionIntensity">
+         <property name="suffix">
+          <string>%</string>
+         </property>
+         <property name="minimum">
+          <number>0</number>
+         </property>
+         <property name="maximum">
+          <number>100</number>
+         </property>
+        </widget>
+       </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <widget class="QGroupBox" name="groupClicking">
      <property name="title">
       <string>Clicking a window</string>

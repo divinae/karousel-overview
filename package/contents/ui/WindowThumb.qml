@@ -23,23 +23,27 @@ Item {
 
     // on each side, what makes the gaps between the shrunk windows as big as Karousel's are on screen,
     // grows with the zoom so that the zoom animation starts with windows at their real positions
-    readonly property real restingInsetX: Math.min(overviewRoot.horizontalGap * (1 - strip.thumbScale) / 2, geometry.width * strip.thumbScale / 4)
-    readonly property real restingInsetY: Math.min(overviewRoot.verticalGap * (1 - strip.thumbScale) / 2, geometry.height * strip.thumbScale / 4)
+    readonly property real restingInsetX: Math.min(overviewRoot.horizontalGap * (1 - strip.thumbScale) / 2, shownGeometry.width * strip.thumbScale / 4)
+    readonly property real restingInsetY: Math.min(overviewRoot.verticalGap * (1 - strip.thumbScale) / 2, shownGeometry.height * strip.thumbScale / 4)
     readonly property real insetX: overviewRoot.zoom * restingInsetX
     readonly property real insetY: overviewRoot.zoom * restingInsetY
 
+    // where it's shown, geometry unless its stacked column is spread out, see DesktopRow's fanWindows
+    readonly property rect shownGeometry: strip.shownGeometry(window, geometry)
+    readonly property bool fanned: strip.fanColumn !== null && strip.fanColumn.windows.includes(window)
+
     // where the thumbnail goes, x and width follow it with an animation
-    readonly property real layoutX: strip.toStripX(geometry.x) + insetX
-    readonly property real layoutWidth: geometry.width * strip.thumbScale - 2 * insetX
+    readonly property real layoutX: strip.toStripX(shownGeometry.x) + insetX
+    readonly property real layoutWidth: shownGeometry.width * strip.thumbScale - 2 * insetX
     // where the thumbnail stays, without its inset, while Karousel's view is synced to the preview, NaN when it follows the window
     property real heldX: NaN
 
     // the inset keeps following the zoom, e.g. while it zooms into a clicked window; then it also glides to where the
     // window really is, for windows that Karousel doesn't move with the others, like ones it doesn't tile
     x: strip.syncingScroll && !isNaN(heldX) ? heldX + insetX + (layoutX - insetX - heldX) * strip.settleBlend : layoutX
-    y: (geometry.y - strip.screenGeometry.y) * strip.thumbScale + insetY
+    y: (shownGeometry.y - strip.screenGeometry.y) * strip.thumbScale + insetY
     width: layoutWidth
-    height: geometry.height * strip.thumbScale - 2 * insetY
+    height: shownGeometry.height * strip.thumbScale - 2 * insetY
     z: window.stackingOrder
     // minimized windows are shown after the strip instead, see DesktopRow
     visible: window.normalWindow && !window.minimized && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen)
@@ -175,7 +179,8 @@ Item {
         id: label
 
         readonly property bool showIcon: thumb.overviewRoot.config.ShowIcons
-        readonly property bool showTitle: thumb.overviewRoot.config.ShowTitles || thumb.showControls
+        // also on each window of a spread out stacked column, to tell them apart
+        readonly property bool showTitle: thumb.overviewRoot.config.ShowTitles || thumb.showControls || thumb.fanned
         readonly property real maxWidth: thumb.width - 2 * Kirigami.Units.smallSpacing
 
         anchors.horizontalCenter: parent.horizontalCenter

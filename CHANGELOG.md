@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10
+- A stacked column spreads out in the overview while the pointer rests on it or on its grip, or a window in it is chosen with the arrow keys: its windows one under another, each with its title, so any of them can be picked; Karousel's layout stays as it is, and the column stacks back when the pointer leaves
+- Color blindness correction in the overview: KWin's correction only applies to windows as KWin draws them, so the overview, which draws them itself, showed uncorrected colors; set the same mode and intensity in the overview's settings, it applies while KWin's correction is turned on
+
 ## 0.9
 - A fullscreen or maximized window is shown in its column's place, which Karousel keeps for it, instead of over the whole strip and all the other windows: on a dark card like a screen, with a "Fullscreen" or "Maximized" label, and the place follows Karousel's scrolling
 

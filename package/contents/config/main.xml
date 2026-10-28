@@ -23,6 +23,18 @@
             <label>Blur the wallpaper behind windows, like KWin's blur behind translucent windows</label>
             <default>true</default>
         </entry>
+        <entry name="ColorCorrection" type="Int">
+            <label>Color blindness correction in the overview, like KWin's effect, which doesn't reach it: 0 none, 1 protanopia, 2 deuteranopia, 3 tritanopia, 4 grayscale</label>
+            <default>0</default>
+            <min>0</min>
+            <max>4</max>
+        </entry>
+        <entry name="ColorCorrectionIntensity" type="Int">
+            <label>Intensity of the color blindness correction, in percent</label>
+            <default>100</default>
+            <min>0</min>
+            <max>100</max>
+        </entry>
         <entry name="ShowMinimized" type="Bool">
             <label>Show minimized windows at the end of their desktop</label>
             <default>true</default>

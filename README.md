@@ -31,7 +31,7 @@ It needs Karousel: it drives Karousel through its key bindings, and Karousel kee
 - Arrow keys move focus between windows and desktops (Karousel scrolls along), Enter closes the overview on the focused window, Delete closes it, Escape clears the search or closes the overview
 
 The gaps between windows are the same as Karousel's, in pixels, although the windows are smaller.
-The height of the desktop rows, centering the clicked window, the "New desktop" row, app icons, window titles, minimized windows and the touchpad gesture can be changed in the effect's settings.
+The height of the desktop rows, centering the clicked window, the "New desktop" row, app icons, window titles, minimized windows, the touchpad gesture and color blindness correction (KWin's own doesn't reach the overview, set the same there) can be changed in the effect's settings.
 
 ## Installation
 Requires Plasma 6 and [Karousel](https://github.com/peterfajdiga/karousel).

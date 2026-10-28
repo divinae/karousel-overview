@@ -13,6 +13,14 @@ Item {
     // main.qml's effect, passed down rather than reached by its id, so that qmllint can follow it
     required property var sceneEffect
     readonly property var config: sceneEffect.configuration
+
+    // the color blindness correction KWin applies to each window as it draws it, which doesn't reach the overview, so
+    // the overview does it over itself, as set in its settings, while KWin's correction is loaded
+    layer.enabled: overview.config.ColorCorrection > 0 && sceneEffect.colorCorrectionLoaded
+    layer.effect: ColorCorrection {
+        mode: overview.config.ColorCorrection
+        intensity: overview.config.ColorCorrectionIntensity / 100
+    }
     // KWin's objects are typed var, qmllint doesn't know their types
     readonly property var targetScreen: KWinComponents.SceneView.screen
     readonly property rect screenGeometry: targetScreen.geometry
