@@ -12,7 +12,7 @@ xgettext --from-code=UTF-8 --language=JavaScript --add-comments=i18n: --sort-by-
     --package-name=karousel_overview --msgid-bugs-address=https://github.com/divinae/karousel-overview/issues \
     --output="$tmp/messages.pot" package/contents/ui/*.qml "$tmp/config.ui.js"
 # the date changes on every run, and the check in CI compares the files
-sed -e '/^"POT-Creation-Date:/d' -e "s|$tmp/||" "$tmp/messages.pot" > po/karousel_overview.pot
+sed -e '/^"POT-Creation-Date:/d' -e "s|$tmp/||g" "$tmp/messages.pot" > po/karousel_overview.pot
 shopt -s nullglob
 for po in po/*.po; do
     msgmerge --quiet --update --backup=none --no-fuzzy-matching "$po" po/karousel_overview.pot

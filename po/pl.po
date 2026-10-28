@@ -30,7 +30,7 @@ msgstr "Wysokość wiersza pulpitu:"
 msgid "In percent of the screen height"
 msgstr "W procentach wysokości ekranu"
 
-#: config.ui.js:4 /tmp/tmp.dUQ8mmmm27/config.ui.js:22
+#: config.ui.js:4 config.ui.js:22
 msgid "%"
 msgstr "%"
 
