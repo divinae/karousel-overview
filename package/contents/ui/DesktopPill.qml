@@ -80,6 +80,13 @@ Rectangle {
                 font.bold: true
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
             }
+
+            AttentionDot {
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: -2
+                visible: pill.strip.overviewRoot.attentionOn(pill.strip.desktop)
+            }
         }
 
         Text {

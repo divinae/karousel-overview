@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11
+- A window that asks for attention is marked in the orange the task manager uses: a thin frame with a soft glow, and its title shown in a muted orange label with a bell, a dot on its desktop's number and on its desktop in the minimap
+- Touchpad scrolling in the overview moves a desktop for each stretch of the swipe, evenly, and a swipe keeps to the direction it started in: up or down changes the desktop, sideways pans the row; before, sideways movement kept resetting the vertical count
+- The touchpad gesture opens or closes the overview depending on how far the fingers went when they're lifted, more than halfway is enough
+- 4 fingers by default for the touchpad gesture
+
 ## 0.10
 - A stacked column spreads out in the overview while the pointer rests on it or on its grip, or a window in it is chosen with the arrow keys: its windows one under another, each with its title, so any of them can be picked; Karousel's layout stays as it is, and the column stacks back when the pointer leaves
 - Color blindness correction in the overview: KWin's correction only applies to windows as KWin draws them, so the overview, which draws them itself, showed uncorrected colors; set the same mode and intensity in the overview's settings, it applies while KWin's correction is turned on

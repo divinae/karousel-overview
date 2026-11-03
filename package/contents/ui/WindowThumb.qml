@@ -17,6 +17,8 @@ Item {
     readonly property var slot: overviewRoot.slotOf(window, strip)
     readonly property rect geometry: slot ?? overviewRoot.layoutGeometryOf(window)
     readonly property bool selected: overviewRoot.selectedWindow === window
+    // it or one of its dialogs asks for attention
+    readonly property bool attention: overviewRoot.needsAttention(window)
     readonly property bool dropTarget: overviewRoot.dropTargetWindow === window
     readonly property bool closing: overviewRoot.closing
     readonly property bool showControls: hover.hovered && overviewRoot.draggedWindow === null && overviewRoot.zoom === 1 && !closing
@@ -52,6 +54,7 @@ Item {
 
     Accessible.role: Accessible.Button
     Accessible.name: window.caption
+    Accessible.description: attention ? I18n.tr("Demands attention") : ""
     Accessible.focused: selected
 
     // follow Karousel's rearranging smoothly, but not while zooming or dragging, when the position has to be exact
@@ -97,6 +100,18 @@ Item {
         shadow.size: Kirigami.Units.gridUnit * (1.5 + 0.75 * thumb.elevation)
         shadow.yOffset: Kirigami.Units.gridUnit * (0.3 + 0.25 * thumb.elevation)
         shadow.color: Qt.rgba(0, 0, 0, 0.25 + 0.1 * thumb.elevation)
+        opacity: thumb.overviewRoot.zoom
+    }
+
+    // asks for attention: an orange glow around it, under the window, so it shows from afar, see AttentionRing; only
+    // the glow, translucent windows aren't tinted
+    Kirigami.ShadowedRectangle {
+        anchors.fill: parent
+        visible: thumb.attention
+        color: "transparent"
+        radius: thumb.overviewRoot.windowRadius
+        shadow.size: Kirigami.Units.gridUnit * 0.6
+        shadow.color: Qt.alpha(thumb.overviewRoot.attentionColor, 0.3)
         opacity: thumb.overviewRoot.zoom
     }
 
@@ -162,6 +177,14 @@ Item {
         visible: zone !== ""
     }
 
+    // asks for attention, in the orange the task manager uses for it; under the selection's ring, which covers it
+    AttentionRing {
+        windowRadius: thumb.overviewRoot.windowRadius
+        baseColor: thumb.overviewRoot.attentionColor
+        visible: thumb.attention
+        opacity: thumb.overviewRoot.zoom
+    }
+
     Rectangle {
         anchors.fill: parent
         anchors.margins: -3
@@ -181,6 +204,7 @@ Item {
         readonly property bool showIcon: thumb.overviewRoot.config.ShowIcons
         // also on each window of a spread out stacked column, to tell them apart
         readonly property bool showTitle: thumb.overviewRoot.config.ShowTitles || thumb.showControls || thumb.fanned
+            || thumb.attention
         readonly property real maxWidth: thumb.width - 2 * Kirigami.Units.smallSpacing
 
         anchors.horizontalCenter: parent.horizontalCenter
@@ -189,7 +213,8 @@ Item {
         width: Math.min(info.implicitWidth, maxWidth) + 2 * Kirigami.Units.smallSpacing
         height: info.implicitHeight + Kirigami.Units.smallSpacing
         radius: Kirigami.Units.cornerRadius
-        color: Qt.rgba(0, 0, 0, 0.7)
+        // a muted orange when it asks for attention, with a bell for the app's icon
+        color: thumb.attention ? Qt.alpha(Qt.darker(thumb.overviewRoot.attentionColor, 1.8), 0.85) : Qt.rgba(0, 0, 0, 0.7)
         visible: (showIcon || showTitle) && !thumb.closing
         opacity: thumb.overviewRoot.zoom
 
@@ -198,17 +223,21 @@ Item {
             anchors.centerIn: parent
             spacing: Kirigami.Units.smallSpacing
 
+            // a bell in place of the app's icon when it asks for attention
             Kirigami.Icon {
                 anchors.verticalCenter: parent.verticalCenter
                 width: Kirigami.Units.iconSizes.small
                 height: width
-                source: thumb.window.icon
-                visible: label.showIcon
+                source: thumb.attention ? "notifications" : thumb.window.icon
+                // the app's icon in its own colours
+                color: thumb.attention ? "white" : "transparent"
+                isMask: thumb.attention
+                visible: label.showIcon || thumb.attention
             }
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.min(implicitWidth, label.maxWidth - (label.showIcon ? Kirigami.Units.iconSizes.small + parent.spacing : 0))
+                width: Math.min(implicitWidth, label.maxWidth - (label.showIcon || thumb.attention ? Kirigami.Units.iconSizes.small + parent.spacing : 0))
                 text: thumb.window.caption
                 elide: Text.ElideRight
                 color: "white"

@@ -7,7 +7,7 @@ import vm from "node:vm";
 const source = readFileSync(new URL("../package/contents/ui/layout.js", import.meta.url), "utf8")
     .replace(/^\.pragma library$/m, "");
 const Layout = {};
-vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, stackBesideMoves, isStacked, fanOut, slotX, lastTiled, expelMoves, columnIndex, isTiledColumn, dropZone, scrollSteps, placeAtEnd, tileMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
+vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, stackBesideMoves, isStacked, fanOut, slotX, lastTiled, expelMoves, columnIndex, isTiledColumn, dropZone, scrollSteps, placeAtEnd, tileMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, touchpadScroll, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
 
 const rect = (x, y, width, height) => ({ x, y, width, height });
 // objects from the vm context have that context's prototypes, which deepEqual tells apart
@@ -349,4 +349,43 @@ test("fanOut spreads a column's windows one under another, as tall as each other
     const column3 = { x: 100, y: 10, width: 900, bottom: 1029 };
     assert.deepEqual(plain(Layout.fanOut(column3, 3, 0, 10, 3)), { x: 100, y: 10, width: 900, height: 333 });
     assert.deepEqual(plain(Layout.fanOut(column3, 3, 2, 10, 3)), { x: 100, y: 696, width: 900, height: 333 });
+});
+
+test("wheelStep keeps counting over events without vertical movement", () => {
+    assert.deepEqual(plain(Layout.wheelStep(-60, 0)), { accumulated: -60, step: 0 });
+});
+
+test("touchpadScroll moves a desktop per stretch of a swipe and keeps a swipe to one direction", () => {
+    const swipe = (moves, start = 0) => {
+        let state = null;
+        let pan = 0;
+        const steps = [];
+        moves.forEach(([dx, dy], i) => {
+            const result = Layout.touchpadScroll(state, dx, dy, start + i * 10);
+            state = result.state;
+            pan += result.pan;
+            if (result.step !== 0) {
+                steps.push(result.step);
+            }
+        });
+        return { state: state, pan: pan, steps: steps };
+    };
+    // a short swipe up, with a little sideways movement: one desktop, no panning
+    const up = swipe(Array(10).fill([3, 30]));
+    assert.deepEqual(up.steps, [-1]);
+    assert.equal(up.pan, 0);
+    // a longer one goes further
+    assert.deepEqual(swipe(Array(30).fill([0, 30])).steps, [-1, -1, -1]);
+    // sideways: pans, no desktop change
+    const side = swipe(Array(20).fill([30, -4]));
+    assert.deepEqual(side.steps, []);
+    assert.equal(side.pan, 30 * 20);
+    // all of a sideways swipe pans, also the start, before its direction was decided
+    assert.equal(swipe(Array(5).fill([8, 0])).pan, 40);
+    // going back the other way counts from there: 200 up, then 240 down is a desktop
+    assert.deepEqual(swipe(Array(10).fill([0, 20]).concat(Array(12).fill([0, -20]))).steps, [1]);
+    // a pause starts a new swipe, which decides its direction again
+    const state = swipe(Array(10).fill([0, -30])).state;
+    const second = Layout.touchpadScroll(state, 30, 0, state.last + 500);
+    assert.equal(second.state.axis, "x");
 });

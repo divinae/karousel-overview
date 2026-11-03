@@ -168,6 +168,30 @@ Item {
         return KWinComponents.Workspace.currentDesktopForScreen(targetScreen);
     }
 
+    // the windows that ask for attention, themselves or through one of their dialogs, also a dialog's dialog, which the
+    // rows don't show; once for all the bindings that ask, see WindowThumb
+    readonly property var attentionWindows: KWinComponents.Workspace.windows.filter(window => window.demandsAttention).map(window => {
+        let root = window;
+        for (let i = 0; i < 10 && root.transientFor; i++) {
+            root = root.transientFor;
+        }
+        return root;
+    })
+    // the orange the task manager uses for it, see AttentionRing
+    readonly property color attentionColor: Kirigami.Theme.neutralTextColor
+
+    function needsAttention(window) {
+        return attentionWindows.includes(window);
+    }
+
+    // whether such a window is on the desktop, in the current activity and on this screen, also one on all desktops,
+    // which the minimap shows on each
+    function attentionOn(desktop) {
+        return desktop !== null && attentionWindows.some(window => (window.desktops.length === 0 || window.desktops.includes(desktop))
+            && (window.activities.length === 0 || window.activities.includes(KWinComponents.Workspace.currentActivity))
+            && (!multipleScreens || window.output === targetScreen));
+    }
+
     function rowForDesktop(desktop) {
         const index = KWinComponents.Workspace.desktops.indexOf(desktop);
         return index === -1 ? null : rows.itemAtIndex(index) as DesktopRow;

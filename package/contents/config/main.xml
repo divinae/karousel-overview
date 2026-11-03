@@ -80,7 +80,7 @@
             <default>false</default>
         </entry>
         <entry name="GestureFingerCount" type="Int">
-            <default>3</default>
+            <default>4</default>
             <min>3</min>
             <max>4</max>
         </entry>

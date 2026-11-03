@@ -1118,7 +1118,9 @@ Item {
                 width: window.frameGeometry.width * row.thumbScale * 0.6
                 height: window.frameGeometry.height * row.thumbScale * 0.6
                 visible: window.minimized && (!row.overviewRoot.multipleScreens || window.output === row.overviewRoot.targetScreen)
-                opacity: (minimizedHover.hovered && row.overviewRoot.draggedWindow === null ? 0.9 : 0.5) * row.overviewRoot.zoom
+                // less dimmed when it asks for attention, its ring would hardly show otherwise
+                opacity: (minimizedHover.hovered && row.overviewRoot.draggedWindow === null || row.overviewRoot.needsAttention(window) ? 0.9 : 0.5)
+                    * row.overviewRoot.zoom
 
                 Accessible.role: Accessible.Button
                 Accessible.name: window.caption
@@ -1143,6 +1145,12 @@ Item {
                     width: Kirigami.Units.iconSizes.medium
                     height: width
                     source: "window-minimize"
+                }
+
+                AttentionRing {
+                    windowRadius: row.overviewRoot.windowRadius * 0.6
+                    baseColor: row.overviewRoot.attentionColor
+                    visible: row.overviewRoot.needsAttention(minimizedThumb.window)
                 }
 
                 HoverHandler {

@@ -333,6 +333,10 @@ function zoomOffset(fullScale, origin, zoom) {
 // accumulates vertical scrolling into steps of one desktop, one mouse wheel notch is 120;
 // returns the new accumulated value and the step (-1, 0 or 1)
 function wheelStep(accumulated, delta) {
+    // an event without vertical movement, e.g. a horizontal one, doesn't start over
+    if (delta === 0) {
+        return { accumulated: accumulated, step: 0 };
+    }
     if (Math.sign(delta) !== Math.sign(accumulated)) {
         accumulated = 0;
     }
@@ -341,6 +345,32 @@ function wheelStep(accumulated, delta) {
         return { accumulated: 0, step: accumulated > 0 ? -1 : 1 };
     }
     return { accumulated: accumulated, step: 0 };
+}
+
+// a touchpad scroll, which keeps sending events while the fingers move: one swipe, events less than 200 ms apart, goes
+// one way, decided once it has moved a little; vertically a desktop for each stepSize it goes, so a longer swipe goes
+// further, horizontally it pans; state is the previous call's, null at first, dx and dy in the units of angleDelta,
+// now in ms; returns the new state, how far to pan and the step to another desktop, -1, 0 or 1
+function touchpadScroll(state, dx, dy, now, stepSize = 240) {
+    if (state === null || now - state.last > 200) {
+        state = { axis: "", x: 0, y: 0, last: now };
+    }
+    // going back the other way starts the count over
+    const y = dy !== 0 && Math.sign(dy) !== Math.sign(state.y) ? 0 : state.y;
+    state = { axis: state.axis, x: state.x + dx, y: y + dy, last: now };
+    let pan = state.axis === "x" ? dx : 0;
+    if (state.axis === "" && Math.abs(state.x) + Math.abs(state.y) >= 20) {
+        state.axis = Math.abs(state.x) > Math.abs(state.y) ? "x" : "y";
+        // also what it moved before that
+        pan = state.axis === "x" ? state.x : 0;
+    }
+    let step = 0;
+    if (state.axis === "y" && Math.abs(state.y) >= stepSize) {
+        step = state.y > 0 ? -1 : 1;
+        // what's left over counts toward the next one
+        state.y -= Math.sign(state.y) * stepSize;
+    }
+    return { state: state, pan: pan, step: step };
 }
 
 // how fast to scroll when dragging close to an edge, from -1 (left) to 1 (right)

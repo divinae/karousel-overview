@@ -145,7 +145,7 @@ KWinComponents.SceneEffect {
                     }
                 }
                 onActivated: effect.finishGesture(true)
-                onCancelled: effect.finishGesture(effect.activated)
+                onCancelled: effect.finishGesture(effect.partialActivationFactor >= 0.5)
             }
 
             readonly property QtObject closeGesture: KWinComponents.SwipeGestureHandler {
@@ -157,7 +157,7 @@ KWinComponents.SceneEffect {
                     }
                 }
                 onActivated: effect.finishGesture(false)
-                onCancelled: effect.finishGesture(effect.activated)
+                onCancelled: effect.finishGesture(effect.partialActivationFactor >= 0.5)
             }
         }
     }

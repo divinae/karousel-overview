@@ -11,6 +11,8 @@ Item {
 
     WheelHandler {
         property real accumulatedY: 0
+        // the touchpad's swipe so far, see Layout.touchpadScroll
+        property var swipe: null
 
         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         onWheel: event => {
@@ -21,16 +23,26 @@ Item {
                 deltaY = 0;
             }
 
+            let step = 0;
+            // a touchpad sends a stream of small events for each swipe, a mouse wheel one per notch
+            if (point.device.type === PointerDevice.TouchPad) {
+                const scroll = Layout.touchpadScroll(swipe, deltaX, deltaY, Date.now());
+                swipe = scroll.state;
+                deltaX = scroll.pan;
+                step = scroll.step;
+            } else {
+                const wheel = Layout.wheelStep(accumulatedY, deltaY);
+                accumulatedY = wheel.accumulated;
+                step = wheel.step;
+            }
+
             if (deltaX !== 0) {
                 const position = navigation.mapToItem(navigation.overviewRoot, point.position.x, point.position.y);
                 const row = navigation.overviewRoot.rowAt(position) ?? navigation.overviewRoot.currentRow;
                 row?.panBy(deltaX);
             }
-
-            const wheel = Layout.wheelStep(accumulatedY, deltaY);
-            accumulatedY = wheel.accumulated;
-            if (wheel.step !== 0) {
-                navigation.overviewRoot.selectRow(wheel.step);
+            if (step !== 0) {
+                navigation.overviewRoot.selectRow(step);
             }
             event.accepted = true;
         }

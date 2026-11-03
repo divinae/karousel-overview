@@ -203,8 +203,11 @@ Item {
                             radius: 3
                             // in the theme's colours, like the windows themselves
                             color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.9)
-                            border.width: 1
-                            border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.3)
+                            // orange when it asks for attention, like in the rows
+                            readonly property bool attention: minimap.overviewRoot.needsAttention(window)
+                            border.width: attention ? 2 : 1
+                            border.color: attention ? minimap.overviewRoot.attentionColor
+                                : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.3)
 
                             // dimmed while it's dragged, like in the rows
                             opacity: minimap.drag.window === window ? 0.3 : 1
@@ -333,6 +336,14 @@ Item {
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         font.bold: card.target
                     }
+                }
+
+                // a window on the desktop asks for attention, also a minimized one; last, over the frames
+                AttentionDot {
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Kirigami.Units.smallSpacing
+                    visible: minimap.overviewRoot.attentionOn(card.desktop)
                 }
             }
         }

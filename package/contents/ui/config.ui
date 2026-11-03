@@ -336,7 +336,7 @@
          <item>
           <widget class="QSpinBox" name="kcfg_GestureFingerCount">
            <property name="toolTip">
-            <string>With 4 fingers, this clashes with Plasma's own Overview effect, which uses the same gesture</string>
+            <string>4 fingers is also the gesture of Plasma's own Overview effect, turn that effect off or use 3 fingers</string>
            </property>
            <property name="enabled">
             <bool>false</bool>
