@@ -249,7 +249,7 @@ msgctxt "@action:button the windows of a column"
 msgid "Unstack"
 msgstr ""
 
-#: package/contents/ui/DesktopPill.qml:96
+#: package/contents/ui/DesktopPill.qml:97
 #: package/contents/ui/DesktopRow.qml:101
 msgid "New desktop"
 msgstr ""
