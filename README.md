@@ -1,12 +1,40 @@
 # Karousel Overview
-A [Niri](https://github.com/YaLTeR/niri)-style overview effect for KWin, made for the [Karousel](https://github.com/peterfajdiga/karousel) scrollable tiling script.
 
-It shows all virtual desktops stacked vertically, each one as a zoomed-out horizontal strip of its windows, including the columns scrolled off-screen.
-It needs Karousel: it drives Karousel through its key bindings, and Karousel keeps off-screen columns at their real positions, so the strips are rebuilt from window geometry.
+[![CI](https://github.com/divinae/karousel-overview/actions/workflows/ci.yml/badge.svg)](https://github.com/divinae/karousel-overview/actions/workflows/ci.yml)
+[![KDE Store](https://img.shields.io/badge/KDE%20Store-Karousel%20Overview-1d99f3?logo=kde&logoColor=white)](https://store.kde.org/p/2379855/)
+[![Release](https://img.shields.io/github/v/release/divinae/karousel-overview?color=1d99f3)](https://github.com/divinae/karousel-overview/releases/latest)
+[![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](#license)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/divinae4535)
+
+**All your desktops and every column, at once.** A [Niri](https://github.com/YaLTeR/niri)-style
+overview effect for KWin, made for the [Karousel](https://github.com/peterfajdiga/karousel)
+scrollable tiling script: all virtual desktops stacked vertically, each one a zoomed-out
+horizontal strip of its windows, including the columns scrolled off-screen.
 
 ![Karousel Overview with three desktops](docs/screenshot.png)
 
-## Usage
+### Why you'll like it
+
+- 🗺️ **The whole layout in view.** Every desktop as a strip, with the columns Karousel keeps off
+  screen; pan a strip and Karousel's real view scrolls along, so you land where you looked.
+- ✋ **Rearrange by dragging.** Move a window to another desktop, stack it onto another window,
+  put it above or below in a column or give it a column of its own; move whole columns; drop it
+  between desktops for a new one.
+- 🔍 **Type to find.** Search the current desktop's windows, with KRunner's results, apps and
+  more in the same panel.
+- ⌨️ **Keys and gestures.** Meta+Ctrl+O, a screen edge or a touchpad swipe; arrow keys between
+  windows and desktops, and Karousel's own key bindings keep working.
+- 🧹 **Desktops that come and go.** Create, rename and remove desktops in place; optionally, as
+  GNOME's dynamic workspaces, the ones made in the overview go again once they're empty.
+- ✨ **Feels native.** The gaps are Karousel's, translucent windows get the blurred wallpaper
+  behind them, and minimized ones wait dimmed at the end of their desktop.
+
+It needs Karousel: it drives Karousel through its key bindings, and Karousel keeps off-screen
+columns at their real positions, so the strips are rebuilt from window geometry.
+
+<details>
+<summary><b>Everything you can do in it</b></summary>
+
 - Toggle with Meta+Ctrl+O, a screen edge (System Settings → Screen Edges) or a touchpad swipe up (enable in the effect's settings)
 - Click a window to focus it, or click an empty part of a desktop to switch to it
 - Drag a window to another desktop to move it there, or to the "New desktop" row to create one
@@ -33,12 +61,30 @@ It needs Karousel: it drives Karousel through its key bindings, and Karousel kee
 The gaps between windows are the same as Karousel's, in pixels, although the windows are smaller.
 The height of the desktop rows, centering the clicked window, the "New desktop" row, app icons, window titles, minimized windows, the touchpad gesture and color blindness correction (KWin's own doesn't reach the overview, set the same there) can be changed in the effect's settings.
 
-## Installation
+</details>
+
+## Install
+
 Requires Plasma 6 and [Karousel](https://github.com/peterfajdiga/karousel).
 
-Install it from the [KDE Store](https://www.opendesktop.org/p/2379855/), in System Settings → Desktop Effects → Get New…, or clone the repo and run `make install`.
-Then enable "Karousel Overview" in System Settings → Desktop Effects.
-After updating, restart KWin (or log out and back in) to load the new version.
+### From the KDE Store
+
+System Settings → Desktop Effects → Get New…, search for **Karousel Overview**, or get it from
+[store.kde.org](https://store.kde.org/p/2379855/).
+
+### From source
+
+```sh
+git clone https://github.com/divinae/karousel-overview.git
+cd karousel-overview
+make install
+```
+
+`make install` also installs the effect's translations, which the store's installer doesn't (see
+[Limitations](#limitations)).
+
+Then enable **Karousel Overview** in System Settings → Desktop Effects. After updating, restart
+KWin (or log out and back in) to load the new version.
 
 ## Limitations
 - Which desktops were created in the overview is forgotten when KWin restarts, those then stay like any other desktop
@@ -54,6 +100,20 @@ To add a language, copy the template, e.g. `msginit --input=po/karousel_overview
 
 ## Support
 If you find the overview useful, you can buy me a coffee on [Ko-fi](https://ko-fi.com/divinae4535).
+
+## Bugs and ideas
+Report them in [GitHub Issues](https://github.com/divinae/karousel-overview/issues): your distribution, the Plasma and Karousel versions, the effect's version, and for a problem KWin's log.
+To get it, do what goes wrong, then right after:
+```sh
+journalctl --user -b --since "-15min" | grep -i -E "karousel|kwin" > karousel-overview.log
+```
+Look it over before attaching it: it may name your windows.
+
+A crash takes the whole session's compositor down (KWin restarts, X11 apps close). The system keeps it:
+```sh
+coredumpctl info kwin_wayland > kwin-crash.txt
+```
+Attach `kwin-crash.txt`; its "Stack trace" part is what helps.
 
 ## Development
 KWin caches QML per file path, so a new version of the effect only loads after restarting KWin, and restarting the real KWin also restarts Xwayland, which kills X11 apps.
@@ -72,3 +132,6 @@ Run commands in the nested KWin with `tools/nested-run.sh`, for example:
 tools/nested-run.sh /tmp/karousel-overview-nested qdbus6 org.kde.kglobalaccel /component/kwin org.kde.kglobalaccel.Component.invokeShortcut "Karousel Overview"
 tools/nested-run.sh /tmp/karousel-overview-nested spectacle -b -n -f -o overview.png
 ```
+
+## License
+GPL-3.0-or-later, see `LICENSE`.
