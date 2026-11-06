@@ -177,8 +177,9 @@ Item {
         }
         return root;
     })
-    // the orange the task manager uses for it, see AttentionRing
-    readonly property color attentionColor: Kirigami.Theme.neutralTextColor
+    // the colour scheme's warning colour, orange in Breeze, the one the task manager uses for it, see AttentionRing;
+    // Breeze's orange when the scheme's is hardly a colour, some make it grey, which wouldn't stand out
+    readonly property color attentionColor: Kirigami.Theme.neutralTextColor.hslSaturation >= 0.4 ? Kirigami.Theme.neutralTextColor : "#f67400"
 
     function needsAttention(window) {
         return attentionWindows.includes(window);

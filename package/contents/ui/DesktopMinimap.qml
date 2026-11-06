@@ -340,6 +340,7 @@ Item {
 
                 // a window on the desktop asks for attention, also a minimized one; last, over the frames
                 AttentionDot {
+                    baseColor: minimap.overviewRoot.attentionColor
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: Kirigami.Units.smallSpacing

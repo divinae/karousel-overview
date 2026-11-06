@@ -82,6 +82,7 @@ Rectangle {
             }
 
             AttentionDot {
+                baseColor: pill.strip.overviewRoot.attentionColor
                 anchors.right: parent.right
                 anchors.top: parent.top
                 anchors.margins: -2

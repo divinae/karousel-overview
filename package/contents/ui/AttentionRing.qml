@@ -10,10 +10,10 @@ Rectangle {
     property color baseColor: Kirigami.Theme.neutralTextColor
 
     anchors.fill: parent
-    anchors.margins: -2
+    anchors.margins: -3
     color: "transparent"
-    radius: windowRadius + 2
-    border.width: 2
+    radius: windowRadius + 3
+    border.width: 3
     // see-through, it only has to be noticed
-    border.color: Qt.alpha(baseColor, 0.45)
+    border.color: Qt.alpha(baseColor, 0.75)
 }

@@ -8,8 +8,10 @@ Rectangle {
     width: Kirigami.Units.smallSpacing * 3
     height: width
     radius: width / 2
-    // the orange the task manager uses for it, see OverviewScreen's attentionColor
-    color: Kirigami.Theme.neutralTextColor
+    // OverviewScreen's attentionColor
+    property color baseColor: Kirigami.Theme.neutralTextColor
+
+    color: baseColor
     border.width: 1
     border.color: "white"
 }

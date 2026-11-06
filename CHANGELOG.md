@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- The marks of a window that asks for attention stay orange with colour schemes whose warning colour is grey, and the frame is easier to see
+
 ## 0.11
 - A window that asks for attention is marked in the orange the task manager uses: a thin frame with a soft glow, and its title shown in a muted orange label with a bell, a dot on its desktop's number and on its desktop in the minimap
 - Touchpad scrolling in the overview moves a desktop for each stretch of the swipe, evenly, and a swipe keeps to the direction it started in: up or down changes the desktop, sideways pans the row; before, sideways movement kept resetting the vertical count
