@@ -28,7 +28,8 @@ msgstr ""
 msgid "In percent of the screen height"
 msgstr ""
 
-#: config.ui.js:4 config.ui.js:22
+#: config.ui.js:4
+#: config.ui.js:22
 msgid "%"
 msgstr ""
 
@@ -334,27 +335,27 @@ msgctxt "@action:button the search"
 msgid "Clear"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:57
+#: package/contents/ui/WindowThumb.qml:59
 msgid "Demands attention"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:286
+#: package/contents/ui/WindowThumb.qml:294
 msgid "Fullscreen"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:286
+#: package/contents/ui/WindowThumb.qml:294
 msgid "Maximized"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:305
+#: package/contents/ui/WindowThumb.qml:313
 msgctxt "@action:button a window"
 msgid "Close"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:336
+#: package/contents/ui/WindowThumb.qml:344
 msgid "Toggle floating"
 msgstr ""
 
-#: package/contents/ui/main.qml:129
+#: package/contents/ui/main.qml:127
 msgid "Karousel: Toggle overview"
 msgstr ""

@@ -13,9 +13,11 @@ Item {
     required property DesktopRow strip
     required property OverviewScreen overviewRoot
 
-    // Karousel's layout, also on desktops that aren't current, see OverviewScreen's geometryOf
-    readonly property var slot: overviewRoot.slotOf(window, strip)
-    readonly property rect geometry: slot ?? overviewRoot.layoutGeometryOf(window)
+    // where it's shown: Karousel's layout, also on desktops that aren't current, with the columns after a fullscreen or
+    // maximized window moved aside, see OverviewScreen's geometryOf; Karousel's own is karouselGeometryOf
+    readonly property rect geometry: overviewRoot.geometryOf(window)
+    // fullscreen or maximized, shown as wide as the screen in the strip, see OverviewScreen's fillsOn
+    readonly property bool filling: overviewRoot.shownFilling(window)
     readonly property bool selected: overviewRoot.selectedWindow === window
     // it or one of its dialogs asks for attention
     readonly property bool attention: overviewRoot.needsAttention(window)
@@ -133,7 +135,9 @@ Item {
         FastBlur {
             anchors.fill: parent
             // the row can go away before its thumbnails, when its desktop is removed
-            visible: thumb.overviewRoot.config.BlurBehindWindows && thumb.strip !== null && thumb.strip.desktop !== null && thumb.slot === null
+            visible: thumb.overviewRoot.config.BlurBehindWindows && thumb.strip !== null && thumb.strip.desktop !== null
+                // a fullscreen or maximized window is as big as the screen, it hides it anyway
+                && !thumb.filling
             // FastBlur's largest radius, on a texture of half the size, so it's as strong as KWin's blur
             radius: 64
             source: ShaderEffectSource {
@@ -147,11 +151,11 @@ Item {
             }
         }
 
-        // shown in its column's place, a screen's worth of window in a column: dark around it like a screen, not the
-        // wallpaper, the window keeps its proportions in the middle
+        // a fullscreen or maximized window in a column it shares is shown as big as it was there: dark around it like a
+        // screen, not the wallpaper, the window keeps its proportions in the middle; as wide as the screen it covers this
         Rectangle {
             anchors.fill: parent
-            visible: thumb.slot !== null
+            visible: thumb.filling
             color: Qt.rgba(0, 0, 0, 0.6)
         }
 
@@ -185,15 +189,18 @@ Item {
         opacity: thumb.overviewRoot.zoom
     }
 
+    // like the active window's outline of the Breeze Round decoration: the theme's text colour, see-through; the window
+    // a dragged one would join in the highlight colour, thicker, it has to stand out
     Rectangle {
         anchors.fill: parent
-        anchors.margins: -3
+        anchors.margins: -border.width
         color: "transparent"
-        radius: thumb.overviewRoot.windowRadius + 3
+        radius: thumb.overviewRoot.windowRadius + border.width
         border.width: thumb.dropTarget ? 6 : 3
-        border.color: Kirigami.Theme.highlightColor
+        border.color: thumb.dropTarget ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.45)
         // while dragging, only the window the dragged one would join is highlighted, not every one passed over
         visible: thumb.selected || thumb.dropTarget || (hover.hovered && thumb.overviewRoot.draggedWindow === null)
+        // fainter when only hovered, so that the selected one, which Enter opens, stands out
         opacity: (thumb.selected || thumb.dropTarget ? 1 : 0.5) * thumb.overviewRoot.zoom
     }
 
@@ -246,8 +253,9 @@ Item {
         }
     }
 
-    // fullscreen or maximized, shown in its column's place, see OverviewScreen.slotOf; at the top in the middle,
-    // between the column's Stack button and the close button, the title is at the bottom; only the icon when narrow
+    // fullscreen or maximized, shown as wide as the screen in its column's place, see OverviewScreen's fillsOn; at the
+    // top in the middle, between the column's Stack button and the close button, the title is at the bottom; only the
+    // icon when narrow
     Rectangle {
         id: fillsBadge
         // the text's own width, the row's changes with it
@@ -260,7 +268,7 @@ Item {
         height: Kirigami.Units.iconSizes.smallMedium
         radius: height / 2
         color: Qt.rgba(0, 0, 0, 0.7)
-        visible: thumb.slot !== null && !thumb.closing
+        visible: thumb.filling && !thumb.closing
         opacity: thumb.overviewRoot.zoom
 
         Accessible.role: Accessible.StaticText

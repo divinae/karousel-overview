@@ -39,6 +39,11 @@ QtObject {
             && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen);
     }
 
+    // the windows a desktop's row shows, not minimized ones
+    function windowsOn(desktop) {
+        return KWinComponents.Workspace.windows.filter(window => !window.minimized && belongsTo(window, desktop));
+    }
+
     // Karousel has key bindings that move a whole column for the first twelve desktops, index is the desktop's, the
     // number of desktops for a new one
     function canMoveColumnTo(index) {
@@ -73,9 +78,8 @@ QtObject {
     // desktop: as a column at the end of its strip, as tall as the others there, its windows stacked or one under another
     // as they were; also what tells them from floating windows, see DesktopRow.isFloating
     function rememberAtEnd(windows, desktop) {
-        const others = KWinComponents.Workspace.windows.filter(other => !windows.includes(other) && !other.minimized && belongsTo(other, desktop))
-            .map(other => overviewRoot.geometryOf(other));
-        const geometries = windows.map(window => overviewRoot.geometryOf(window));
+        const others = windowsOn(desktop).filter(other => !windows.includes(other)).map(other => overviewRoot.karouselGeometryOf(other));
+        const geometries = windows.map(window => overviewRoot.karouselGeometryOf(window));
         const left = Math.min(...geometries.map(geometry => geometry.x));
         const top = Math.min(...geometries.map(geometry => geometry.y));
         const width = Math.max(...geometries.map(geometry => geometry.x + geometry.width)) - left;

@@ -7,7 +7,7 @@ import vm from "node:vm";
 const source = readFileSync(new URL("../package/contents/ui/layout.js", import.meta.url), "utf8")
     .replace(/^\.pragma library$/m, "");
 const Layout = {};
-vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, stackBesideMoves, isStacked, fanOut, slotX, lastTiled, expelMoves, columnIndex, isTiledColumn, dropZone, scrollSteps, placeAtEnd, tileMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, touchpadScroll, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
+vm.runInNewContext(source + "\nObject.assign(exports, { KarouselShortcuts, clamp, stripBounds, computeColumns, reorderTarget, insertHintX, stackMoves, stackBesideMoves, isStacked, fanOut, arrangeFills, fillShift, sharedColumn, ownColumn, slotX, clearX, coversArea, expelMoves, columnIndex, isTiledColumn, dropZone, scrollSteps, placeAtEnd, tileMoves, minimizedSlots, snapTarget, zoomScale, zoomOffset, wheelStep, touchpadScroll, edgeScrollSpeed, emptyDesktops, innerGaps });", { exports: Layout });
 
 const rect = (x, y, width, height) => ({ x, y, width, height });
 // objects from the vm context have that context's prototypes, which deepEqual tells apart
@@ -330,12 +330,14 @@ test("slotX finds a column's place among the other columns as they are now", () 
     assert.equal(Layout.slotX(slot, [], area, 8), 328);
 });
 
-test("lastTiled skips the fullscreen and maximized geometries", () => {
-    const layout = (x, width) => ({ geometry: rect(x, 0, width, 1440) });
-    const coverings = [rect(0, 0, 3440, 1440), rect(32, 0, 3408, 1440)];
-    assert.equal(Layout.lastTiled([layout(328, 933), layout(1269, 933), layout(32, 3408)], coverings).geometry.x, 1269);
-    assert.equal(Layout.lastTiled([layout(328, 933), layout(0, 3440), layout(32, 3408)], coverings).geometry.x, 328);
-    assert.equal(Layout.lastTiled([layout(0, 3440)], coverings), undefined);
+test("coversArea tells fullscreen and maximized geometries from tiled ones", () => {
+    const area = rect(0, 0, 1920, 1036);
+    // maximized, fullscreen
+    assert.equal(Layout.coversArea(rect(0, 0, 1920, 1036), area), true);
+    assert.equal(Layout.coversArea(rect(0, 0, 1920, 1080), area), true);
+    // a full-width column keeps the outer gaps, a column maximized vertically only is narrower
+    assert.equal(Layout.coversArea(rect(6, 6, 1908, 1024), area), false);
+    assert.equal(Layout.coversArea(rect(500, 0, 640, 1036), area), false);
 });
 
 test("fanOut spreads a column's windows one under another, as tall as each other", () => {
@@ -388,4 +390,54 @@ test("touchpadScroll moves a desktop per stretch of a swipe and keeps a swipe to
     const state = swipe(Array(10).fill([0, -30])).state;
     const second = Layout.touchpadScroll(state, 30, 0, state.last + 500);
     assert.equal(second.state.axis, "x");
+});
+
+test("arrangeFills and fillShift move the columns after a fullscreen window aside by how much wider it's shown", () => {
+    // its place at 950, 933 wide, shown 3440 wide: the next column, a gap after its place, comes after it
+    const fills = Layout.arrangeFills([{ slot: rect(950, 0, 933, 1440), x: 950, shown: rect(0, 0, 3440, 1440), gap: 0 }]);
+    assert.equal(fills[0].shift, 0);
+    assert.equal(Layout.fillShift(fills, 8), 0);
+    assert.equal(Layout.fillShift(fills, 1891), 2507);
+    // two of them, in any order: the second one is moved by the first
+    const two = Layout.arrangeFills([{ slot: rect(1891, 0, 933, 1440), x: 1891, shown: rect(0, 0, 3440, 1440), gap: 0 }, { slot: rect(950, 0, 933, 1440), x: 950, shown: rect(0, 0, 3440, 1440), gap: 0 }]);
+    assert.deepEqual(two.map(fill => [fill.x, fill.shift]), [[950, 0], [1891, 2507]]);
+    assert.equal(Layout.fillShift(two, 2832), 5014);
+    // shown as big as its place, e.g. in a column with other windows: nothing moves
+    assert.equal(Layout.fillShift(Layout.arrangeFills([{ slot: rect(950, 0, 933, 1440), x: 950, shown: rect(0, 0, 933, 1440), gap: 0 }]), 1891), 0);
+    // two with no known place, where they really are: one after the other, in the given order, a gap after each
+    const unknown = Layout.arrangeFills([{ slot: null, x: 32, shown: rect(0, 0, 3408, 1440), gap: 8 }, { slot: null, x: 32, shown: rect(0, 0, 3408, 1440), gap: 8 }]);
+    assert.deepEqual(unknown.map(fill => fill.shift), [0, 3416]);
+    // a column just left of one stays where it is
+    assert.equal(Layout.fillShift(unknown.slice(0, 1), 28), 0);
+    assert.equal(Layout.fillShift(unknown.slice(0, 1), 32), 3416);
+});
+
+test("sharedColumn tells a window alone in its column from one sharing it", () => {
+    const area = rect(0, 0, 1920, 1080);
+    assert.equal(Layout.sharedColumn(rect(16, 16, 900, 1048), area, []), false);
+    // stacked, the top one and the bottom one
+    assert.equal(Layout.sharedColumn(rect(16, 16, 900, 1016), area, []), true);
+    assert.equal(Layout.sharedColumn(rect(24, 48, 900, 1016), area, []), true);
+    // the lower half of a column
+    assert.equal(Layout.sharedColumn(rect(16, 548, 900, 516), area, []), true);
+    // outer gaps that differ at the top and the bottom, told from a column of a single window
+    const lone = { y: 0, bottom: 1064, windows: ["a"] };
+    const pair = { y: 0, bottom: 500, windows: ["b", "c"] };
+    assert.equal(Layout.sharedColumn(rect(16, 0, 900, 1064), area, [pair, lone]), false);
+    assert.equal(Layout.sharedColumn(rect(16, 0, 900, 524), area, [pair, lone]), true);
+});
+
+test("ownColumn finds the column as wide as the window nearest to where it was", () => {
+    const columns = [{ x: 16, width: 900 }, { x: 930, width: 640 }, { x: 1580, width: 900 }];
+    assert.equal(Layout.ownColumn(columns, rect(1200, 16, 905, 1016), 36).x, 1580);
+    assert.equal(Layout.ownColumn(columns, rect(200, 16, 905, 1016), 36).x, 16);
+    assert.equal(Layout.ownColumn(columns, rect(200, 16, 1200, 1016), 36), null);
+    // the one with room where it was, the lower half, before a nearer one as tall as the screen
+    const split = [{ x: 16, y: 16, bottom: 1064, width: 900 }, { x: 1580, y: 16, bottom: 532, width: 900 }];
+    assert.equal(Layout.ownColumn(split, rect(200, 548, 900, 516), 36).x, 1580);
+});
+
+test("clearX shows a window with no known place after the columns reaching over where it is", () => {
+    assert.equal(Layout.clearX(0, [rect(-400, 0, 900, 1000), rect(508, 0, 600, 1000)], 8), 508);
+    assert.equal(Layout.clearX(0, [rect(-900, 0, 892, 1000)], 8), 0);
 });

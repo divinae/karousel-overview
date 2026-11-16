@@ -193,12 +193,60 @@ function placeAtEnd(others, area, width, gap) {
     };
 }
 
-// the latest of a window's remembered layouts, oldest first, whose geometry isn't one of the coverings, those of a
-// fullscreen or maximized window; undefined without one
-function lastTiled(layouts, coverings) {
-    const same = (a, b) => Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1
-        && Math.abs(a.width - b.width) <= 1 && Math.abs(a.height - b.height) <= 1;
-    return layouts.slice().reverse().find(layout => !coverings.some(covering => same(layout.geometry, covering)));
+// the fullscreen and maximized windows of a desktop, which the overview shows as big as they really are, in their
+// column's place, wider than the place, the columns after them moved aside: each with slot its place, null when it
+// isn't known, x where it starts, shown where it's shown, gap the room after it when it has no place with gaps of its
+// own; returns them in order, each also with shift, how far it's moved by those before it, after, from which x on the
+// other windows come after it, and extra, how far it moves those; in the given order when two are at the same x
+function arrangeFills(fills) {
+    let shift = 0;
+    return fills.map((fill, i) => ({ fill: fill, i: i })).sort((a, b) => a.fill.x - b.fill.x || a.i - b.i).map(({ fill }) => {
+        const width = fill.slot !== null ? fill.slot.width : 0;
+        const extra = fill.shown.width - width + fill.gap;
+        const arranged = Object.assign({}, fill, { shift: shift, after: fill.x + Math.max(0, width - 2), extra: extra });
+        shift += extra;
+        return arranged;
+    });
+}
+
+// how far a window at x is moved aside by a desktop's fills, see arrangeFills
+function fillShift(fills, x) {
+    return fills.reduce((shift, fill) => x >= fill.after ? shift + fill.extra : shift, 0);
+}
+
+// whether a window that was tiled at tiled was in a column with other windows: alone in a column it reaches as high
+// and as low as the tallest column of a single window, columns, Karousel's outer gaps; Karousel shares a column's
+// height out, also when it stacks the windows; without such a column, alone it has as much room above as below it
+function sharedColumn(tiled, area, columns) {
+    const lone = columns.filter(column => column.windows.length === 1)
+        .reduce((best, column) => best === null || column.bottom - column.y > best.bottom - best.y ? column : best, null);
+    if (lone !== null) {
+        return Math.abs(tiled.y - lone.y) > 4 || Math.abs(tiled.y + tiled.height - lone.bottom) > 4;
+    }
+    return Math.abs((tiled.y - area.y) - (area.y + area.height - tiled.y - tiled.height)) > 4;
+}
+
+// the column of a window that was tiled at tiled with other windows, which Karousel keeps while the window fills the
+// screen: of the columns as wide as it, within tolerance, one with room where it was, above or below the others, then
+// the one nearest to where it was, Karousel may have scrolled since; null when there's none
+function ownColumn(columns, tiled, tolerance) {
+    const room = column => column.bottom <= tiled.y + tolerance || column.y >= tiled.y + tiled.height - tolerance;
+    const better = (a, b) => room(a) !== room(b) ? room(a) : Math.abs(a.x - tiled.x) < Math.abs(b.x - tiled.x);
+    return columns.filter(column => Math.abs(column.width - tiled.width) <= tolerance)
+        .reduce((best, column) => best === null || better(column, best) ? column : best, null);
+}
+
+// where a window whose column's place isn't known is shown, from where it really is, x: after the windows, rects, that
+// reach over x from its left, a gap away, so that it doesn't cover them; the ones from x on are moved aside
+function clearX(x, rects, gap) {
+    return rects.filter(rect => rect.x < x && rect.x + rect.width > x)
+        .reduce((clear, rect) => Math.max(clear, rect.x + rect.width + gap), x);
+}
+
+// whether a window's geometry covers the area Karousel tiles in, as a fullscreen or maximized window's does; Karousel
+// tiles a window like that only without outer gaps, in a column as wide as the screen
+function coversArea(geometry, area) {
+    return geometry.width >= area.width - 1 && geometry.height >= area.height - 1;
 }
 
 // the x of a fullscreen or maximized window's column, which Karousel keeps empty among the other columns, also while

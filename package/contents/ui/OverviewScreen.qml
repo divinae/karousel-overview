@@ -117,43 +117,102 @@ Item {
         }
     }
 
-    // where a window is in Karousel's layout: on other desktops than the current one where it was while its desktop
-    // was current, KWin has moved the windows far off screen since, see main.qml's layouts
+    // where a window is shown in the strip: where Karousel has it, see layoutGeometryOf, the columns after a
+    // fullscreen or maximized window moved aside, see fillsOn
     function geometryOf(window) {
-        return slotOf(window) ?? layoutGeometryOf(window);
+        const fills = fillsOf(window);
+        if (fills === undefined) {
+            return layoutGeometryOf(window);
+        }
+        const own = fills.find(fill => fill.window === window);
+        if (own !== undefined) {
+            return Qt.rect(own.x + own.shift, own.shown.y, own.shown.width, own.shown.height);
+        }
+        const geometry = layoutGeometryOf(window);
+        return Qt.rect(geometry.x + Layout.fillShift(fills, geometry.x), geometry.y, geometry.width, geometry.height);
     }
 
-    // a fullscreen or maximized window in its column's place, which Karousel keeps empty among the other columns, as
-    // they are now, see Layout.slotX; null when it isn't shown there, e.g. it was floating; row is its desktop's, given
-    // by its thumbnail, which is created within the row before rowForDesktop finds it, and a binding wouldn't ask again
-    function slotOf(window, row = null) {
-        const effect = overview.sceneEffect;
-        const tiled = effect.fillsScreen(window) ? effect.tiledGeometry(window) : null;
-        if (tiled !== null && row === null) {
-            row = rowForDesktop(window.desktops[0]);
+    // where Karousel has a window, for a fullscreen or maximized one its column's place; not moved aside like geometryOf
+    function karouselGeometryOf(window) {
+        return fillsOf(window)?.find(fill => fill.window === window)?.slot ?? layoutGeometryOf(window);
+    }
+
+    // fullscreen and maximized windows, shown as they really are, as wide as the screen, in their column's place, the
+    // other columns after it moved aside, see geometryOf; in a column with other windows, which Karousel keeps, as big
+    // as it was there; where they really are when the place isn't known, e.g. they were already fullscreen when KWin
+    // started, or they float; by desktop id, see Layout.arrangeFills, slot is the place and shown how it's shown
+    readonly property var fillsOn: {
+        const result = {};
+        // only the desktops with one, most have none
+        const desktops = new Set();
+        for (const window of KWinComponents.Workspace.windows) {
+            if (!window.minimized && sceneEffect.fillsScreen(window)) {
+                window.desktops.forEach(desktop => desktops.add(desktop));
+            }
         }
-        if (tiled === null || row === null || row.desktop !== window.desktops[0]) {
-            return null;
+        for (const desktop of KWinComponents.Workspace.desktops.filter(desktop => desktops.has(desktop))) {
+            const windows = desktopActions.windowsOn(desktop);
+            // from left to right, where they were tiled, so that each one's place is found among the ones before it
+            const filling = windows.filter(window => sceneEffect.fillsScreen(window))
+                .map(window => ({ window: window, tiled: sceneEffect.tiledGeometry(window) }))
+                .sort((a, b) => (a.tiled?.x ?? Infinity) - (b.tiled?.x ?? Infinity));
+            if (filling.length === 0) {
+                continue;
+            }
+            const fills = [];
+            for (const { window, tiled } of filling) {
+                const real = layoutGeometryOf(window);
+                const place = tiled === null ? null : placeOf(window, tiled, windows, fills);
+                fills.push({
+                    window: window,
+                    slot: place?.rect ?? null,
+                    // where it really is, after the columns that reach over that
+                    x: place?.rect.x ?? Layout.clearX(real.x, windows.filter(other => other.output === window.output
+                        && !sceneEffect.fillsScreen(other)).map(other => layoutGeometryOf(other)), horizontalGap),
+                    // shared, it's shown in its column as big as it was there
+                    shown: place?.shared ? place.rect : real,
+                    gap: place === null ? horizontalGap : 0,
+                });
+            }
+            result[desktop.id] = Layout.arrangeFills(fills);
         }
+        return result;
+    }
+
+    // a fullscreen or maximized window's column's place, among the other windows of its desktop and the places of the
+    // ones before it: the empty place Karousel keeps among the other columns, as they are now, see Layout.slotX, or
+    // its own column when it shares it, which stays, shared then; null when it isn't known, e.g. it was floating
+    function placeOf(window, tiled, windows, before) {
         const area = KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, window.output, window.desktops[0]);
         const tolerance = Kirigami.Units.gridUnit * 4;
+        const entries = windows.filter(other => other.output === window.output && !sceneEffect.fillsScreen(other))
+            .map(other => ({ window: other, geometry: layoutGeometryOf(other) }))
+            .concat(before.filter(fill => fill.slot !== null).map(fill => ({ window: fill.window, geometry: fill.slot })));
+        const all = Layout.computeColumns(entries);
+        const columns = all.filter(column => Layout.isTiledColumn(column, area, tolerance));
+        // in a shared column it, or what's left of the column without it, can be half as tall as a tiled column is
+        if (Layout.sharedColumn(tiled, area, columns)) {
+            const column = Layout.ownColumn(all, tiled, Kirigami.Units.gridUnit * 2);
+            return column === null ? null : { rect: Qt.rect(column.x, tiled.y, tiled.width, tiled.height), shared: true };
+        }
         if (!Layout.isTiledColumn({ y: tiled.y, bottom: tiled.y + tiled.height }, area, tolerance)) {
             return null;
         }
-        // the windows the row shows, of the current activity and on its screen; those also filling the screen to the
-        // left of it where they're shown, so that two of them don't take the same place
-        const others = row.karouselWindows().filter(other => other !== window && other.output === window.output);
-        const before = other => {
-            const otherTiled = effect.tiledGeometry(other);
-            return otherTiled !== null && (otherTiled.x < tiled.x || (otherTiled.x === tiled.x && other.internalId.toString() < window.internalId.toString()));
-        };
-        const entries = others.filter(other => !effect.fillsScreen(other)).map(other => ({ window: other, geometry: layoutGeometryOf(other) }))
-            .concat(others.filter(other => effect.fillsScreen(other) && before(other)).map(other => ({ window: other, geometry: slotOf(other, row) }))
-                .filter(entry => entry.geometry !== null));
-        const columns = Layout.computeColumns(entries).filter(column => Layout.isTiledColumn(column, area, tolerance));
-        return Qt.rect(Layout.slotX(tiled, columns, area, horizontalGap), tiled.y, tiled.width, tiled.height);
+        return { rect: Qt.rect(Layout.slotX(tiled, columns, area, horizontalGap), tiled.y, tiled.width, tiled.height), shared: false };
     }
 
+    // the fullscreen and maximized windows of a window's desktop, undefined when there are none, see fillsOn
+    function fillsOf(window) {
+        return window.desktops.length === 1 ? fillsOn[window.desktops[0].id] : undefined;
+    }
+
+    // whether a window is a fullscreen or maximized one shown in the strip, see fillsOn
+    function shownFilling(window) {
+        return fillsOf(window)?.some(fill => fill.window === window) ?? false;
+    }
+
+    // where Karousel has a window: on other desktops than the current one where it was while its desktop was current,
+    // KWin has moved the windows far off screen since, see main.qml's layouts
     function layoutGeometryOf(window) {
         if (window.desktops.length === 1 && window.desktops[0] !== overview.activeDesktop) {
             const remembered = overview.sceneEffect.rememberedGeometry(window);

@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.12
+- A fullscreen or maximized window is shown as wide as the screen, as it really is, in its column's place, and the columns after it move aside; one whose place isn't known, e.g. already fullscreen when KWin started, shows where it really is instead of over the whole strip
+- The overview zooms straight into an active fullscreen or maximized window, when opening and after clicking it, instead of jumping to it at the end
+- A window made fullscreen right after it was un-maximized keeps its place among the columns, instead of covering its neighbours and leaving a gap
+- A window maximized from the lower part of a column it shares stays in that column, dark around it like a screen, and the minimap shows Karousel's layout
+- A fullscreen window whose place isn't known is shown after a column that reaches over its left edge instead of over it, and a window in a column it shares is found by the room it left there
+- The frame around the hovered or selected window is a see-through outline in the theme's text colour, like Breeze Round's active window outline; the window a dragged one would join keeps the highlight colour
 - The marks of a window that asks for attention stay orange with colour schemes whose warning colour is grey, and the frame is easier to see
 
 ## 0.11

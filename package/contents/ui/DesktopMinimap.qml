@@ -192,8 +192,9 @@ Item {
 
                             required property var window
 
-                            // where Karousel lays it out, also on desktops that aren't current
-                            readonly property rect geometry: minimap.overviewRoot.geometryOf(window)
+                            // where Karousel lays it out, also on desktops that aren't current; a fullscreen or
+                            // maximized window in its column's place, the card is a screen, not the strip
+                            readonly property rect geometry: minimap.overviewRoot.karouselGeometryOf(window)
 
                             x: (geometry.x - minimap.screenGeometry.x) * card.windowScale
                             y: (geometry.y - minimap.screenGeometry.y) * card.windowScale

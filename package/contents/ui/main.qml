@@ -28,17 +28,13 @@ KWinComponents.SceneEffect {
         return window.fullScreen || window.maximizeMode === 3;
     }
 
-    // where a fullscreen or maximized window was last tiled on the desktop it's on, null when not known; KWin gives a
-    // window its fullscreen or maximized geometry before it says so, the latest of the last few that doesn't cover the
-    // screen is the one
+    // where a fullscreen or maximized window was last tiled on the desktop it's on, null when not known
     function tiledGeometry(window) {
         if (window.desktops.length !== 1) {
             return null;
         }
-        const desktop = window.desktops[0];
-        const coverings = [window.output.geometry, KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, window.output, desktop)];
-        const layout = Layout.lastTiled((tiledLayouts[layoutKey(window)] ?? []).filter(layout => layout.desktop === desktop.id), coverings);
-        return layout?.geometry ?? null;
+        const layouts = (tiledLayouts[layoutKey(window)] ?? []).filter(layout => layout.desktop === window.desktops[0].id);
+        return layouts.length > 0 ? layouts[layouts.length - 1].geometry : null;
     }
 
     // Karousel has a layout for each desktop in each activity, a window in several activities has one in each
@@ -59,8 +55,10 @@ KWinComponents.SceneEffect {
                 desktop: desktop.id,
             };
             layouts[layoutKey(window)] = layout;
-            // the last few, see tiledGeometry
-            if (!fillsScreen(window)) {
+            // the last few, see tiledGeometry; told by the geometry, not by whether it's fullscreen or maximized: KWin
+            // changes the geometry before it says so, and when it's no longer maximized, after Karousel has tiled it
+            const area = KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, window.output, desktop);
+            if (!Layout.coversArea(geometry, area)) {
                 tiledLayouts[layoutKey(window)] = (tiledLayouts[layoutKey(window)] ?? []).slice(-2).concat([layout]);
             }
         }

@@ -100,6 +100,20 @@ Item {
     Accessible.role: Accessible.List
     Accessible.name: desktop !== null ? desktop.name : I18n.tr("New desktop")
 
+    // the screen shows the active window when it's fullscreen or maximized, which the strip shows in its column's place,
+    // moved aside from where it really is, see OverviewScreen's fillsOn: the screen's place in the strip is moved by as
+    // much, so that the zoom goes into that window, not into the columns behind it; not when it's shown in a column it
+    // shares, as big as it was there
+    readonly property real viewportShift: {
+        const window = KWinComponents.Workspace.activeWindow;
+        if (!scrollsKarousel || window === null || window.output !== overviewRoot.targetScreen || !overviewRoot.shownFilling(window)
+                || window.desktops[0] !== desktop) {
+            return 0;
+        }
+        const shown = overviewRoot.geometryOf(window);
+        return Math.abs(shown.width - window.frameGeometry.width) <= 1 ? shown.x - window.frameGeometry.x : 0;
+    }
+
     function toStripX(x) {
         return (x - stripMinX) * thumbScale + padding;
     }
@@ -136,7 +150,7 @@ Item {
             return;
         }
         // not with a fullscreen or maximized window, which covers the screen while Karousel keeps its column's place
-        // empty, see OverviewScreen.slotOf, the gap would be that place
+        // empty, see OverviewScreen.placeOf, the gap would be that place
         const windows = karouselWindows();
         if (windows.some(window => overviewRoot.sceneEffect.fillsScreen(window))) {
             return;
@@ -221,12 +235,7 @@ Item {
     }
 
     function computeKarouselWindows() {
-        const activity = KWinComponents.Workspace.currentActivity;
-        return KWinComponents.Workspace.windows
-            .filter(window => window.normalWindow && !window.minimized
-                && window.desktops.length === 1 && window.desktops[0] === desktop
-                && (window.activities.length === 0 || window.activities.includes(activity))
-                && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen));
+        return overviewRoot.desktopActions.windowsOn(desktop);
     }
 
     // lays out minimized windows one after another after the strip
@@ -603,6 +612,12 @@ Item {
     // scrolls Karousel's real view by whole columns, so that the column at the wallpaper's left edge in the preview
     // is at the screen's left edge, then puts the view back on the wallpaper, where the windows now are
     function syncKarouselScroll() {
+        // the active fullscreen or maximized window covers the screen whatever Karousel shows behind it, and the
+        // wallpaper isn't where Karousel's view is then, see viewportShift
+        if (viewportShift !== 0) {
+            glideToViewport();
+            return;
+        }
         // Karousel's own columns, which its scroll key bindings count, not the floating windows, and also those the
         // search hides
         const lefts = karouselColumns().map(column => toStripX(column.x));
@@ -1069,7 +1084,7 @@ Item {
         // the part of the strip that is visible on screen, where the wallpaper and its shadow go, not drawn itself
         Item {
             id: viewportFrame
-            x: row.toStripX(row.screenGeometry.x)
+            x: row.toStripX(row.screenGeometry.x + row.viewportShift)
             width: row.screenGeometry.width * row.thumbScale
             height: row.height
         }
