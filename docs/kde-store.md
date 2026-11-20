@@ -60,6 +60,7 @@ Enable it in System Settings > Desktop Effects. After an update, restart KWin (o
 Source, issues and the full README: https://github.com/divinae/karousel-overview
 
 Support: https://ko-fi.com/divinae4535
+Made with AI: most of the code is written with Claude, Anthropic's AI assistant. I decide what goes in and review every change before a release.
 ```
 
 **Changelog**

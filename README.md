@@ -133,5 +133,9 @@ tools/nested-run.sh /tmp/karousel-overview-nested qdbus6 org.kde.kglobalaccel /c
 tools/nested-run.sh /tmp/karousel-overview-nested spectacle -b -n -f -o overview.png
 ```
 
+## AI assistance
+
+Made with AI: most of the code is written with Claude, Anthropic's AI assistant. I decide what goes in and review every change before a release.
+
 ## License
 GPL-3.0-or-later, see `LICENSE`.
