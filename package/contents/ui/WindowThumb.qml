@@ -372,8 +372,10 @@ Item {
         onTapped: thumb.overviewRoot.activateWindow(thumb.window)
     }
 
+    // a touch has no buttons, Qt doesn't look at acceptedButtons for it, so a tap would close the window too
     TapHandler {
         acceptedButtons: Qt.MiddleButton
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         gesturePolicy: TapHandler.ReleaseWithinBounds
         onTapped: thumb.window.closeWindow()
     }

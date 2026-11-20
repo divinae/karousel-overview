@@ -912,6 +912,8 @@ Item {
 
         target: null
         acceptedButtons: Qt.RightButton
+        // a touch has no buttons, Qt doesn't look at acceptedButtons for it, so it would take a window's drag
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         yAxis.enabled: false
         grabPermissions: PointerHandler.CanTakeOverFromAnything
 
