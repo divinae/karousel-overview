@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.1
+- On a touch screen, tapping a window focuses it instead of also closing it, as a middle-click does, and dragging a window with a finger moves the window instead of panning the row like a right-click drag
+- After a monitor is plugged in or out, windows on desktops other than the current one show on their screen again instead of shifted aside until their desktop has been visited, and a desktop's windows are remembered where they are once it's current again, also when they didn't move, so the overview doesn't slide them back to where they were on the other screen after leaving it
+
 ## 0.12
 - A fullscreen or maximized window is shown as wide as the screen, as it really is, in its column's place, and the columns after it move aside; one whose place isn't known, e.g. already fullscreen when KWin started, shows where it really is instead of over the whole strip
 - The overview zooms straight into an active fullscreen or maximized window, when opening and after clicking it, instead of jumping to it at the end
