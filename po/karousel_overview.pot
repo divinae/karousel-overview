@@ -355,6 +355,6 @@ msgstr ""
 msgid "Toggle floating"
 msgstr ""
 
-#: package/contents/ui/main.qml:127
+#: package/contents/ui/main.qml:164
 msgid "Karousel: Toggle overview"
 msgstr ""

@@ -34,7 +34,16 @@ KWinComponents.SceneEffect {
             return null;
         }
         const layouts = (tiledLayouts[layoutKey(window)] ?? []).filter(layout => layout.desktop === window.desktops[0].id);
-        return layouts.length > 0 ? layouts[layouts.length - 1].geometry : null;
+        return layouts.length > 0 ? onOutput(layouts[layouts.length - 1], window) : null;
+    }
+
+    // a remembered layout's geometry on the screen the window is on now: when a monitor is plugged in or out, KWin
+    // moves the windows to another screen, or the screens move, also those on desktops that aren't current, which
+    // keep their remembered layout until their desktop is current again; moved by as much as the screen's corner is
+    function onOutput(layout, window) {
+        const now = window.output.geometry;
+        const geometry = layout.geometry;
+        return Qt.rect(geometry.x - layout.origin.x + now.x, geometry.y - layout.origin.y + now.y, geometry.width, geometry.height);
     }
 
     // Karousel has a layout for each desktop in each activity, a window in several activities has one in each
@@ -53,13 +62,21 @@ KWinComponents.SceneEffect {
             const layout = {
                 geometry: Qt.rect(geometry.x, geometry.y, geometry.width, geometry.height),
                 desktop: desktop.id,
+                // the corner of the screen it was on, see onOutput
+                origin: Qt.point(window.output.geometry.x, window.output.geometry.y),
             };
             layouts[layoutKey(window)] = layout;
             // the last few, see tiledGeometry; told by the geometry, not by whether it's fullscreen or maximized: KWin
             // changes the geometry before it says so, and when it's no longer maximized, after Karousel has tiled it
             const area = KWinComponents.Workspace.clientArea(KWinComponents.Workspace.MaximizeArea, window.output, desktop);
-            if (!Layout.coversArea(geometry, area)) {
-                tiledLayouts[layoutKey(window)] = (tiledLayouts[layoutKey(window)] ?? []).slice(-2).concat([layout]);
+            // not again when nothing changed, see rememberCurrentDesktops, it would push out the ones before
+            const tiled = tiledLayouts[layoutKey(window)] ?? [];
+            const last = tiled[tiled.length - 1];
+            const same = last !== undefined && last.desktop === layout.desktop
+                && [last.geometry.x, last.geometry.y, last.geometry.width, last.geometry.height, last.origin.x, last.origin.y].join()
+                    === [geometry.x, geometry.y, geometry.width, geometry.height, layout.origin.x, layout.origin.y].join();
+            if (!Layout.coversArea(geometry, area) && !same) {
+                tiledLayouts[layoutKey(window)] = tiled.slice(-2).concat([layout]);
             }
         }
     }
@@ -67,7 +84,7 @@ KWinComponents.SceneEffect {
     // null when not known for the desktop the window is on now, e.g. after it was moved to another one
     function rememberedGeometry(window) {
         const layout = layouts[layoutKey(window)];
-        return layout !== undefined && window.desktops.length === 1 && layout.desktop === window.desktops[0].id ? layout.geometry : null;
+        return layout !== undefined && window.desktops.length === 1 && layout.desktop === window.desktops[0].id ? onOutput(layout, window) : null;
     }
 
     // the effect's id from a delegate, like below
@@ -83,6 +100,10 @@ KWinComponents.SceneEffect {
             function onFrameGeometryChanged() {
                 effect.rememberGeometry(tracker.window);
             }
+            // on another screen without being moved, e.g. its screen was plugged in or out while its desktop was current
+            function onOutputChanged() {
+                effect.rememberGeometry(tracker.window);
+            }
             Component.onCompleted: effect.rememberGeometry(tracker.window)
             Component.onDestruction: {
                 for (const store of [effect.layouts, effect.tiledLayouts]) {
@@ -94,6 +115,22 @@ KWinComponents.SceneEffect {
         }
     }
     // qmllint enable unqualified
+
+    // a desktop's windows where they are once it's current again, also those that don't move then: after a monitor was
+    // plugged in or out, KWin moved them while their desktop wasn't current, and where Karousel has them now may be
+    // where KWin put them, so the layout remembered before, for the other screen, would stay
+    Connections {
+        target: KWinComponents.Workspace
+        function onCurrentDesktopChanged() {
+            Qt.callLater(effect.rememberCurrentDesktops);
+        }
+    }
+
+    function rememberCurrentDesktops() {
+        for (const window of KWinComponents.Workspace.windows) {
+            rememberGeometry(window);
+        }
+    }
 
     // KWin creates the delegate outside this file's context, so the components here can't be bound to it
     // (pragma ComponentBehavior: Bound), and the linter can't tell that the effect's id is reachable from them

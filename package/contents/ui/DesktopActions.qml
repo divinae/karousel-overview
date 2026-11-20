@@ -92,6 +92,7 @@ QtObject {
             overviewRoot.sceneEffect.layouts[overviewRoot.sceneEffect.layoutKey(window)] = {
                 geometry: Qt.rect(place.x + geometry.x - left, place.y + (geometry.y - top) * scale, geometry.width, geometry.height * scale),
                 desktop: desktop.id,
+                origin: Qt.point(overviewRoot.screenGeometry.x, overviewRoot.screenGeometry.y),
             };
         });
     }

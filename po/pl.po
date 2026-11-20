@@ -382,6 +382,6 @@ msgstr "Zamknij"
 msgid "Toggle floating"
 msgstr "Przełącz pływanie"
 
-#: package/contents/ui/main.qml:127
+#: package/contents/ui/main.qml:164
 msgid "Karousel: Toggle overview"
 msgstr "Karousel: Przełącz przegląd"
