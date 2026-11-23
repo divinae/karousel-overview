@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.12.2
 - The touchpad gesture opens the overview also while a desktop switch is still sliding, e.g. right after a three-finger swipe: KWin doesn't start the overview meanwhile, which left it counted as open with nothing on screen, ignoring the gesture for a while; it now starts once the slide is over
 - Windows kept out of the window switcher, like a drop-down terminal parked above the screen, aren't shown in the overview, on the minimap's cards or among the minimized windows, as in KWin's own overview
 
