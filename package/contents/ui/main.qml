@@ -199,15 +199,56 @@ KWinComponents.SceneEffect {
 
     // qmllint enable unqualified
 
+    // the screens' overviews that are there now, see OverviewScreen; KWin doesn't start the effect while another
+    // fullscreen effect runs, e.g. the slide of a desktop switch with three fingers, and doesn't say so: the effect is
+    // shown with nothing on screen, so it asks again until the overview is there, showing it again when it runs does
+    // nothing; reset after a while, so that it doesn't stay open with nothing on screen and ignore the gesture
+    property int liveScreens: 0
+
+    Timer {
+        id: startTimer
+        property int attempts: 0
+        interval: 100
+        repeat: true
+        onTriggered: {
+            if (!effect.visible || effect.liveScreens > 0) {
+                stop();
+            } else if (++attempts > 30) {
+                stop();
+                console.warn("Karousel Overview: KWin didn't show the overview, it's reset");
+                deactivateTimer.stop();
+                effect.gestureInProgress = false;
+                effect.activated = false;
+                effect.partialActivationFactor = 0;
+                effect.visible = false;
+            } else {
+                effect.show();
+            }
+        }
+    }
+
+    // see liveScreens
+    function show() {
+        if (liveScreens === 0) {
+            visible = false;
+        }
+        visible = true;
+        if (liveScreens === 0 && !startTimer.running) {
+            startTimer.attempts = 0;
+            startTimer.start();
+        }
+    }
+
     Timer {
         id: deactivateTimer
         interval: effect.animationDuration
         onTriggered: effect.visible = false
     }
 
-    // called by each screen's overview as it's destroyed after closing, removing desktops while its rows are torn down
-    // crashes KWin, so only after that
+    // called by each screen's overview as it's destroyed after closing, see liveScreens; removing desktops while its
+    // rows are torn down crashes KWin, so only after that
     function overviewDestroyed() {
+        liveScreens = Math.max(0, liveScreens - 1);
         if (!visible && configuration.RemoveEmptyDesktops) {
             Qt.callLater(removeEmptyDesktops);
         }
@@ -259,7 +300,7 @@ KWinComponents.SceneEffect {
         }
         deactivateTimer.stop();
         colorCorrectionCheck.call();
-        visible = true;
+        show();
         activated = true;
     }
 
@@ -276,7 +317,7 @@ KWinComponents.SceneEffect {
             colorCorrectionCheck.call();
         }
         deactivateTimer.stop();
-        visible = true;
+        show();
         gestureInProgress = true;
         partialActivationFactor = factor;
     }

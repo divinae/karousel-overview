@@ -921,5 +921,6 @@ Item {
         // the current row stays centered on what's on screen, which is where the zoom starts from
         captureZoomOrigin();
         organized = true;
+        sceneEffect.liveScreens++;
     }
 }
