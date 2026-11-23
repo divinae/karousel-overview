@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- Windows kept out of the window switcher, like a drop-down terminal parked above the screen, aren't shown in the overview, on the minimap's cards or among the minimized windows, as in KWin's own overview
+
 ## 0.12.1
 - On a touch screen, tapping a window focuses it instead of also closing it, as a middle-click does, and dragging a window with a finger moves the window instead of panning the row like a right-click drag
 - After a monitor is plugged in or out, windows on desktops other than the current one show on their screen again instead of shifted aside until their desktop has been visited, and a desktop's windows are remembered where they are once it's current again, also when they didn't move, so the overview doesn't slide them back to where they were on the other screen after leaving it

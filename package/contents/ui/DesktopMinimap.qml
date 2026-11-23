@@ -200,7 +200,8 @@ Item {
                             y: (geometry.y - minimap.screenGeometry.y) * card.windowScale
                             width: geometry.width * card.windowScale
                             height: geometry.height * card.windowScale
-                            visible: !minimap.overviewRoot.multipleScreens || window.output === minimap.overviewRoot.targetScreen
+                            // not one out of the switcher, a drop-down terminal, see WindowThumb
+                            visible: !window.skipSwitcher && (!minimap.overviewRoot.multipleScreens || window.output === minimap.overviewRoot.targetScreen)
                             radius: 3
                             // in the theme's colours, like the windows themselves
                             color: Qt.rgba(Kirigami.Theme.backgroundColor.r, Kirigami.Theme.backgroundColor.g, Kirigami.Theme.backgroundColor.b, 0.9)

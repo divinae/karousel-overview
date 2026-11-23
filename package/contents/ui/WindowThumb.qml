@@ -49,8 +49,9 @@ Item {
     width: layoutWidth
     height: shownGeometry.height * strip.thumbScale - 2 * insetY
     z: window.stackingOrder
-    // minimized windows are shown after the strip instead, see DesktopRow
-    visible: window.normalWindow && !window.minimized && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen)
+    // minimized windows are shown after the strip instead, see DesktopRow; a window out of the switcher (a drop-down
+    // terminal, kept hidden above the screen) isn't one to pick here, as in KWin's own overview
+    visible: window.normalWindow && !window.minimized && !window.skipSwitcher && (!overviewRoot.multipleScreens || window.output === overviewRoot.targetScreen)
     // a window that shows up while the view is synced has no place among the held thumbnails yet
     opacity: strip.syncingScroll && isNaN(heldX) ? 0 : overviewRoot.draggedWindows.includes(window) ? 0.3 : 1
 

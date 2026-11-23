@@ -334,24 +334,24 @@ msgctxt "@action:button the search"
 msgid "Clear"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:59
+#: package/contents/ui/WindowThumb.qml:60
 msgid "Demands attention"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:294
+#: package/contents/ui/WindowThumb.qml:295
 msgid "Fullscreen"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:294
+#: package/contents/ui/WindowThumb.qml:295
 msgid "Maximized"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:313
+#: package/contents/ui/WindowThumb.qml:314
 msgctxt "@action:button a window"
 msgid "Close"
 msgstr ""
 
-#: package/contents/ui/WindowThumb.qml:344
+#: package/contents/ui/WindowThumb.qml:345
 msgid "Toggle floating"
 msgstr ""
 

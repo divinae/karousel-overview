@@ -1134,7 +1134,7 @@ Item {
                 y: (row.height - height) / 2
                 width: window.frameGeometry.width * row.thumbScale * 0.6
                 height: window.frameGeometry.height * row.thumbScale * 0.6
-                visible: window.minimized && (!row.overviewRoot.multipleScreens || window.output === row.overviewRoot.targetScreen)
+                visible: window.minimized && !window.skipSwitcher && (!row.overviewRoot.multipleScreens || window.output === row.overviewRoot.targetScreen)
                 // less dimmed when it asks for attention, its ring would hardly show otherwise
                 opacity: (minimizedHover.hovered && row.overviewRoot.draggedWindow === null || row.overviewRoot.needsAttention(window) ? 0.9 : 0.5)
                     * row.overviewRoot.zoom
